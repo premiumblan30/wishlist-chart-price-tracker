@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Edit, Trash2, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react'
@@ -57,6 +57,13 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
     navigate(`/items/${item.id}`)
   }
 
+  const handleCardKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleCardClick()
+    }
+  }
+
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onEdit(item)
@@ -68,19 +75,23 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
   }
 
   return (
-    <Card
+    <div
+      role="button"
+      tabIndex={0}
       className={`overflow-hidden cursor-pointer hover:shadow-lg transition-shadow ${
         hitTarget ? 'border-2 border-green-500 animate-pulse' : ''
       }`}
       onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
     >
-      <CardContent className="p-0">
-        {hitTarget && (
-          <div className="bg-green-500 text-white text-center py-2 text-sm font-medium">
-            🎯 Target Tercapai!
-          </div>
-        )}
-        <div className="flex">
+      {hitTarget && (
+        <div className="bg-green-500 text-white text-center py-2 text-sm font-medium">
+          🎯 Target Tercapai!
+        </div>
+      )}
+      <Card className="border-0 shadow-none hover:shadow-lg transition-shadow">
+        <CardContent className="p-0">
+          <div className="flex">
           {item.image_url ? (
             <div className="w-32 h-32 flex-shrink-0 bg-muted">
               <img
@@ -212,5 +223,6 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
         </div>
       </CardContent>
     </Card>
+    </div>
   )
 }

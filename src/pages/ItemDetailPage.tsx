@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Plus, Trash2, RefreshCw, Home, TrendingUp, TrendingDown, Minus, ExternalLink, Download } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, Home, TrendingUp, TrendingDown, Minus, ExternalLink, Download } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer, Legend } from 'recharts'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate, formatPriceHistoryDate, formatDistanceToNow } from '@/lib/utils'
@@ -276,6 +276,23 @@ export function ItemDetailPage() {
     }
   }, [pollingJobId, id, supabase])
 
+  // Prepare chart data (move before early returns to fix hooks order violation)
+  const filteredChartData = useMemo(() => {
+    let data = priceHistory.map(h => ({
+      date: h.scraped_at,
+      price: h.price,
+    }))
+
+    if (chartRange !== 'Semua') {
+      const now = new Date()
+      const daysAgo = chartRange === '7H' ? 7 : chartRange === '30H' ? 30 : 90
+      const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000)
+      data = data.filter(h => new Date(h.date) >= cutoffDate)
+    }
+
+    return data
+  }, [priceHistory, chartRange])
+
   if (loading) {
     return (
       <Layout title="Item Details">
@@ -305,23 +322,6 @@ export function ItemDetailPage() {
   const firstPrice = priceHistory.length > 0 ? priceHistory[0].price : 0
   const latestPrice = priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].price : 0
   const percentChange = firstPrice > 0 ? ((latestPrice - firstPrice) / firstPrice) * 100 : 0
-
-  // Prepare chart data
-  const filteredChartData = useMemo(() => {
-    let data = priceHistory.map(h => ({
-      date: h.scraped_at,
-      price: h.price,
-    }))
-
-    if (chartRange !== 'Semua') {
-      const now = new Date()
-      const daysAgo = chartRange === '7H' ? 7 : chartRange === '30H' ? 30 : 90
-      const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000)
-      data = data.filter(h => new Date(h.date) >= cutoffDate)
-    }
-
-    return data
-  }, [priceHistory, chartRange])
 
   const chartData = filteredChartData
 
