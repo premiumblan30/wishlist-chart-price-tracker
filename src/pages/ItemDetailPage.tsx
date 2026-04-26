@@ -26,8 +26,6 @@ export function ItemDetailPage() {
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
   const [entryToDelete, setEntryToDelete] = useState<PriceHistory | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [scrapeJobStatus, setScrapeJobStatus] = useState<string | null>(null)
-  const [pollingJobId, setPollingJobId] = useState<string | null>(null)
   const [chartRange, setChartRange] = useState<'7H' | '30H' | '90H' | 'Semua'>('Semua')
 
   useEffect(() => {
@@ -197,18 +195,40 @@ export function ItemDetailPage() {
     try {
       setIsRefreshing(true)
 
-      const { data, error } = await supabase.functions.invoke('manual-scrape', {
-        body: { item_id: id },
-      })
+      const res = await fetch(
+        `https://api.github.com/repos/${import.meta.env.VITE_GITHUB_OWNER}/${import.meta.env.VITE_GITHUB_REPO}/actions/workflows/scrape.yml/dispatches`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ ref: 'main' }),
+        }
+      )
 
-      if (error) throw error
+      if (res.status === 204) {
+        toast.success('Scraping dijadwalkan! Data akan update dalam ~1 menit.')
 
-      if (data.success) {
-        toast.success('Scraping dijadwalkan. Harga akan diperbarui dalam beberapa menit.')
-        setPollingJobId(data.job_id)
-        setScrapeJobStatus('pending')
+        // Auto-refresh price history after 90 seconds
+        setTimeout(async () => {
+          try {
+            const { data: historyData, error: historyError } = await supabase
+              .from('price_history')
+              .select('*')
+              .eq('item_id', id)
+              .order('scraped_at', { ascending: true })
+
+            if (historyError) throw historyError
+            setPriceHistory(historyData || [])
+            toast.success('Harga berhasil diperbarui')
+          } catch (err) {
+            console.error('Failed to refresh price history:', err)
+          }
+        }, 90000)
       } else {
-        toast.error('Gagal menjadwalkan scraping. Coba lagi.')
+        throw new Error(`GitHub API error: ${res.status}`)
       }
     } catch (err) {
       console.error('Failed to trigger scrape:', err)
@@ -217,64 +237,6 @@ export function ItemDetailPage() {
       setIsRefreshing(false)
     }
   }
-
-  // Poll scrape job status
-  useEffect(() => {
-    if (!pollingJobId || !id) return
-
-    let pollInterval: number
-    let timeoutId: number
-
-    const pollJobStatus = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('scrape_jobs')
-          .select('status, error_msg')
-          .eq('id', pollingJobId)
-          .single()
-
-        if (error) throw error
-
-        if (data.status === 'done') {
-          setScrapeJobStatus('done')
-          setPollingJobId(null)
-          toast.success('Harga berhasil diperbarui')
-
-          // Re-fetch price history
-          const { data: historyData, error: historyError } = await supabase
-            .from('price_history')
-            .select('*')
-            .eq('item_id', id)
-            .order('scraped_at', { ascending: true })
-
-          if (!historyError) {
-            setPriceHistory(historyData || [])
-          }
-        } else if (data.status === 'error') {
-          setScrapeJobStatus('error')
-          setPollingJobId(null)
-          toast.error(data.error_msg || 'Gagal melakukan scraping')
-        }
-      } catch (err) {
-        console.error('Failed to poll job status:', err)
-      }
-    }
-
-    // Poll every 5 seconds
-    pollInterval = setInterval(pollJobStatus, 5000)
-
-    // Stop polling after 2 minutes
-    timeoutId = setTimeout(() => {
-      clearInterval(pollInterval)
-      setPollingJobId(null)
-      setScrapeJobStatus(null)
-    }, 120000)
-
-    return () => {
-      clearInterval(pollInterval)
-      clearTimeout(timeoutId)
-    }
-  }, [pollingJobId, id, supabase])
 
   // Prepare chart data (move before early returns to fix hooks order violation)
   const filteredChartData = useMemo(() => {
@@ -408,15 +370,6 @@ export function ItemDetailPage() {
                 <Button variant="ghost" size="icon" onClick={handleRefreshPrice} disabled={isRefreshing}>
                   <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </Button>
-                {scrapeJobStatus && (
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${
-                    scrapeJobStatus === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                    scrapeJobStatus === 'done' ? 'bg-green-100 text-green-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {scrapeJobStatus === 'pending' ? 'Scraping...' : scrapeJobStatus}
-                  </span>
-                )}
                 <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={priceHistory.length === 0}>
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
