@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { TrendingDown, TrendingUp, Minus, Plus, RefreshCw, Trash2, Home } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, RefreshCw, Home, TrendingUp, TrendingDown, Minus, ExternalLink, Download } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Legend } from 'recharts'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate, formatPriceHistoryDate } from '@/lib/utils'
@@ -552,7 +552,21 @@ export function ItemDetailPage() {
                       {recentHistory.map((entry) => (
                         <tr key={entry.id} className="border-b">
                           <td className="py-3 px-4">{formatDate(entry.scraped_at)}</td>
-                          <td className="py-3 px-4 font-medium">{formatCurrency(entry.price, item.currency)}</td>
+                          <td className="py-3 px-4 font-medium">
+                            {entry.source === 'cron' && entry.source_url ? (
+                              <a
+                                href={entry.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-teal-600 hover:text-teal-700 hover:underline inline-flex items-center gap-1"
+                              >
+                                {formatCurrency(entry.price, item.currency)}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              formatCurrency(entry.price, item.currency)
+                            )}
+                          </td>
                           <td className="py-3 px-4 capitalize">{entry.source}</td>
                           <td className="py-3 px-4">
                             <span className={`px-2 py-1 text-xs font-medium rounded ${

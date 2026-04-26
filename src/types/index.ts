@@ -22,6 +22,7 @@ export interface PriceHistory {
   scraped_at: string
   source: 'cron' | 'manual' | 'import'
   status: 'success' | 'failed' | 'unavailable' | 'changed_url'
+  source_url?: string
 }
 
 export interface User {

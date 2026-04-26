@@ -114,6 +114,8 @@ def scrape_item(item_id: str, url: str, marketplace: str) -> dict:
             'price': price,
             'source': 'cron',
             'status': 'success',
+            'source_url': url,
+            'scraped_at': datetime.utcnow().isoformat()
         }).execute()
 
         return {
