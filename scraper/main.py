@@ -84,14 +84,17 @@ def get_tokopedia_variant_price(product_url: str, variant_key: str) -> float | N
 
         variants = variant_data.get('variants', [])
         target_names = [v.strip() for v in variant_key.split('|')]
+        print(f'Target variant names: {target_names}')
 
         # Build option_id lookup: name -> id
         name_to_id = {}
         for variant in variants:
             for opt in variant.get('option', []):
                 name_to_id[opt['value'].strip()] = str(opt['id'])
+        print(f'Available options: {name_to_id}')
 
         target_ids = set(name_to_id.get(n) for n in target_names if name_to_id.get(n))
+        print(f'Target IDs: {target_ids}')
 
         # Find product where all target option IDs are in its combination
         for product in variant_data.get('products', []):
@@ -178,7 +181,7 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
 
     # Use variant API for Tokopedia if variant_key is provided
     if marketplace == 'tokopedia' and variant_key:
-        print(f'Using variant API for variant: {variant_key}')
+        print(f'Scraping variant: {variant_key} for {item_id}')
         price = get_tokopedia_variant_price(url, variant_key)
         if price:
             print(f'Variant price found: {price}')
