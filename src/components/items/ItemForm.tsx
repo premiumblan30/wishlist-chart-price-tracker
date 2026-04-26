@@ -26,6 +26,7 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
   const [targetPrice, setTargetPrice] = useState<number | undefined>()
   const [imageUrl, setImageUrl] = useState('')
   const [notes, setNotes] = useState('')
+  const [variantKey, setVariantKey] = useState('')
 
   useEffect(() => {
     if (initialData) {
@@ -35,6 +36,7 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
       setTargetPrice(initialData.target_price)
       setImageUrl(initialData.image_url || '')
       setNotes(initialData.notes || '')
+      setVariantKey(initialData.variant_key || '')
     } else {
       setName('')
       setUrl('')
@@ -42,6 +44,7 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
       setTargetPrice(undefined)
       setImageUrl('')
       setNotes('')
+      setVariantKey('')
     }
   }, [initialData, open])
 
@@ -62,6 +65,7 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
       currency: 'IDR',
       is_active: true,
       notes: notes || undefined,
+      variant_key: variantKey || undefined,
     })
     
     onClose()
@@ -146,6 +150,20 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
                 placeholder="Additional notes..."
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="variantKey">Varian (opsional)</Label>
+              <Input
+                id="variantKey"
+                value={variantKey}
+                onChange={(e) => setVariantKey(e.target.value)}
+                placeholder="KING|630T Egyptian"
+                className="mb-1"
+              />
+              <p className="text-xs text-muted-foreground">
+                Pisahkan varian dengan | jika ada lebih dari satu pilihan (untuk produk multi-variant)
+              </p>
             </div>
           </div>
           

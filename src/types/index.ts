@@ -11,6 +11,7 @@ export interface Item {
   currency: string
   is_active: boolean
   notes?: string
+  variant_key?: string
   created_at: string
   updated_at: string
 }
