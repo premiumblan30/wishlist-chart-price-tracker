@@ -1,0 +1,164 @@
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { detectMarketplace } from '@/lib/utils'
+import type { Marketplace, Item } from '@/types'
+
+interface ItemFormProps {
+  open: boolean
+  onClose: () => void
+  onSubmit: (item: Omit<Item, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
+  initialData?: Item
+}
+
+export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps) {
+  const [name, setName] = useState('')
+  const [url, setUrl] = useState('')
+  const [marketplace, setMarketplace] = useState<Marketplace>('other')
+  const [targetPrice, setTargetPrice] = useState<number | undefined>()
+  const [imageUrl, setImageUrl] = useState('')
+  const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name)
+      setUrl(initialData.url)
+      setMarketplace(initialData.marketplace)
+      setTargetPrice(initialData.target_price)
+      setImageUrl(initialData.image_url || '')
+      setNotes(initialData.notes || '')
+    } else {
+      setName('')
+      setUrl('')
+      setMarketplace('other')
+      setTargetPrice(undefined)
+      setImageUrl('')
+      setNotes('')
+    }
+  }, [initialData, open])
+
+  const handleUrlChange = (value: string) => {
+    setUrl(value)
+    setMarketplace(detectMarketplace(value))
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    onSubmit({
+      name,
+      url,
+      marketplace,
+      image_url: imageUrl || undefined,
+      target_price: targetPrice,
+      currency: 'IDR',
+      is_active: true,
+      notes: notes || undefined,
+    })
+    
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{initialData ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Item Name *</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g., Nike Air Max"
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="url">Product URL *</Label>
+              <Input
+                id="url"
+                type="url"
+                value={url}
+                onChange={(e) => handleUrlChange(e.target.value)}
+                placeholder="https://shopee.co.id/product/..."
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="marketplace">Marketplace</Label>
+              <select
+                id="marketplace"
+                value={marketplace}
+                onChange={(e) => setMarketplace(e.target.value as Marketplace)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+              >
+                <option value="shopee">Shopee</option>
+                <option value="tokopedia">Tokopedia</option>
+                <option value="lazada">Lazada</option>
+                <option value="blibli">Blibli</option>
+                <option value="official">Official Site</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="targetPrice">Target Price (IDR)</Label>
+              <Input
+                id="targetPrice"
+                type="number"
+                value={targetPrice || ''}
+                onChange={(e) => setTargetPrice(e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="1500000"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="imageUrl">Image URL (Optional)</Label>
+              <Input
+                id="imageUrl"
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Additional notes..."
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              {initialData ? 'Update' : 'Add'} Item
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
