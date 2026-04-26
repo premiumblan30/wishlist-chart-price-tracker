@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, Plus, Trash2, RefreshCw, Home, TrendingUp, TrendingDown, Minus, ExternalLink, Download } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer, Legend } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, formatDate, formatPriceHistoryDate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatPriceHistoryDate, formatDistanceToNow } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Item, PriceHistory } from '@/types'
 
@@ -398,6 +398,11 @@ export function ItemDetailPage() {
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl font-bold truncate">{item.name}</h1>
                 <p className="text-muted-foreground capitalize">{item.marketplace}</p>
+                {priceHistory.length > 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Terakhir diperbarui: {formatDistanceToNow(priceHistory[priceHistory.length - 1].scraped_at)}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="icon" onClick={handleRefreshPrice} disabled={isRefreshing}>
@@ -445,110 +450,118 @@ export function ItemDetailPage() {
           )}
 
           {/* Chart */}
-          {priceHistory.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Price History</CardTitle>
-                <CardDescription>Price changes over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={formatPriceHistoryDate}
-                      />
-                      <YAxis
-                        tickFormatter={(value) => {
-                          if (value >= 1000000) return `Rp ${(value / 1000000).toFixed(1)}jt`
-                          if (value >= 1000) return `Rp ${(value / 1000).toFixed(0)}k`
-                          return `Rp ${value}`
-                        }}
-                      />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-background border rounded-lg p-3 shadow-lg">
-                                <p className="font-medium">{formatCurrency(payload[0].value as number, 'IDR')}</p>
-                                <p className="text-sm text-muted-foreground">{formatDate(payload[0].payload.date)}</p>
-                              </div>
-                            )
-                          }
-                          return null
-                        }}
-                      />
-                      <Legend
-                        verticalAlign="top"
-                        height={36}
-                        content={({ payload }) => (
-                          <div className="flex items-center justify-center gap-6">
-                            {payload?.map((entry: any, index: number) => (
-                              <div key={index} className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                                <span className="text-sm">{entry.value === 'price' ? 'Harga Aktual' : 'Target Harga'}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      />
-                      {item.target_price && (
-                        <ReferenceLine
-                          y={item.target_price}
-                          stroke="red"
-                          strokeDasharray="5 5"
-                          label="Target"
-                        />
-                      )}
-                      {item.target_price && latestPrice > 0 && (
-                        <ReferenceArea
-                          y1={lowestPrice}
-                          y2={item.target_price}
-                          fill={latestPrice <= item.target_price ? '#22c55e' : '#ef4444'}
-                          fillOpacity={0.08}
-                        />
-                      )}
-                      <Line
-                        type="monotone"
-                        dataKey="price"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
-                        name="price"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                {/* Chart Range Selector */}
-                <div className="flex items-center justify-center gap-2 mt-4">
-                  {(['7H', '30H', '90H', 'Semua'] as const).map((range) => (
-                    <button
-                      key={range}
-                      onClick={() => setChartRange(range)}
-                      className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                        chartRange === range
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted hover:bg-muted/80'
-                      }`}
-                    >
-                      {range}
-                    </button>
+          <Card>
+            <CardHeader>
+              <CardTitle>Price History</CardTitle>
+              <CardDescription>Price changes over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="h-[400px] flex items-end justify-center gap-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className="w-12 bg-gray-800 animate-pulse rounded-t"
+                      style={{ height: `${30 + Math.random() * 60}%` }}
+                    />
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="pt-6">
+              ) : priceHistory.length > 0 ? (
+                <>
+                  <div className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={formatPriceHistoryDate}
+                        />
+                        <YAxis
+                          tickFormatter={(value) => {
+                            if (value >= 1000000) return `Rp ${(value / 1000000).toFixed(1)}jt`
+                            if (value >= 1000) return `Rp ${(value / 1000).toFixed(0)}k`
+                            return `Rp ${value}`
+                          }}
+                        />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-background border rounded-lg p-3 shadow-lg">
+                                  <p className="font-medium">{formatCurrency(payload[0].value as number, 'IDR')}</p>
+                                  <p className="text-sm text-muted-foreground">{formatDate(payload[0].payload.date)}</p>
+                                </div>
+                              )
+                            }
+                            return null
+                          }}
+                        />
+                        <Legend
+                          verticalAlign="top"
+                          height={36}
+                          content={({ payload }) => (
+                            <div className="flex items-center justify-center gap-6">
+                              {payload?.map((entry: any, index: number) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                                  <span className="text-sm">{entry.value === 'price' ? 'Harga Aktual' : 'Target Harga'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        />
+                        {item.target_price && (
+                          <ReferenceLine
+                            y={item.target_price}
+                            stroke="red"
+                            strokeDasharray="5 5"
+                            label="Target"
+                          />
+                        )}
+                        {item.target_price && latestPrice > 0 && (
+                          <ReferenceArea
+                            y1={lowestPrice}
+                            y2={item.target_price}
+                            fill={latestPrice <= item.target_price ? '#22c55e' : '#ef4444'}
+                            fillOpacity={0.08}
+                          />
+                        )}
+                        <Line
+                          type="monotone"
+                          dataKey="price"
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          name="price"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Chart Range Selector */}
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    {(['7H', '30H', '90H', 'Semua'] as const).map((range) => (
+                      <button
+                        key={range}
+                        onClick={() => setChartRange(range)}
+                        className={`px-4 py-2 text-sm rounded-md transition-colors ${
+                          chartRange === range
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted hover:bg-muted/80'
+                        }`}
+                      >
+                        {range}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
                 <div className="flex flex-col items-center justify-center py-12">
                   <TrendingUp className="h-16 w-16 text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">Belum ada data harga. Harga akan muncul setelah scraping pertama.</p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
 
           {/* Stats Row */}
           {priceHistory.length > 0 && (

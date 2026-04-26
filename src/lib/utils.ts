@@ -62,11 +62,27 @@ export function formatDate(date: string): string {
   }).format(new Date(date))
 }
 
-export function formatPriceHistoryDate(date: string): string {
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short'
-  }).format(new Date(date))
+export function formatPriceHistoryDate(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: '2-digit' })
+}
+
+export function formatDistanceToNow(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'baru saja'
+  if (diffMins < 60) return `${diffMins} menit lalu`
+  if (diffHours < 24) return `${diffHours} jam lalu`
+  if (diffDays === 1) return 'kemarin'
+  if (diffDays < 7) return `${diffDays} hari lalu`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} minggu lalu`
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)} bulan lalu`
+  return `${Math.floor(diffDays / 365)} tahun lalu`
 }
 
 export function formatRelativeTime(date: string): string {
@@ -81,4 +97,14 @@ export function formatRelativeTime(date: string): string {
   if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)} weeks ago`
   if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} months ago`
   return `${Math.floor(diffInSeconds / 31536000)} years ago`
+}
+
+export function formatAbbreviatedCurrency(amount: number, currency: string = 'IDR'): string {
+  if (amount >= 1000000) {
+    return `Rp${(amount / 1000000).toFixed(1).replace('.', ',')}jt`
+  }
+  if (amount >= 1000) {
+    return `Rp${(amount / 1000).toFixed(0)}rb`
+  }
+  return `Rp${amount}`
 }

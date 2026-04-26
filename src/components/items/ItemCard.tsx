@@ -1,9 +1,10 @@
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Edit, Trash2, ExternalLink } from 'lucide-react'
+import { Edit, Trash2, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { LineChart, Line } from 'recharts'
-import { formatCurrency, getMarketplaceBadgeColor, calculatePriceGap, formatRelativeTime } from '@/lib/utils'
+import { formatCurrency, getMarketplaceBadgeColor, calculatePriceGap, formatRelativeTime, formatAbbreviatedCurrency } from '@/lib/utils'
 import type { Item, PriceHistory } from '@/types'
 
 interface ItemCardProps {
@@ -26,6 +27,20 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
   const hitTarget = item.target_price && latestPrice <= item.target_price
   const priceDrop = firstPrice > 0 ? ((firstPrice - latestPrice) / firstPrice) * 100 : 0
   const significantDrop = priceDrop >= 5
+
+  // Price change badge (compare two most recent entries)
+  const priceChangeBadge = useMemo(() => {
+    if (!priceHistory || priceHistory.length < 2) return null
+    const recent = priceHistory[0]
+    const previous = priceHistory[1]
+    const change = recent.price - previous.price
+    const isDrop = change < 0
+    return {
+      show: true,
+      isDrop,
+      amount: Math.abs(change)
+    }
+  }, [priceHistory])
 
   // Price gap color: green if current price < target (good), red if current price > target (not yet)
   const priceGapColor = latestPrice < item.target_price ? 'text-green-500' : 'text-red-500'
@@ -100,6 +115,18 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
                     {significantDrop && (
                       <span className="px-2 py-1 text-xs font-medium text-white bg-blue-500 rounded">
                         📉 Drop
+                      </span>
+                    )}
+                    {priceChangeBadge && priceChangeBadge.show && (
+                      <span className={`px-2 py-1 text-xs font-medium text-white rounded flex items-center gap-1 ${
+                        priceChangeBadge.isDrop ? 'bg-green-500' : 'bg-red-500'
+                      }`}>
+                        {priceChangeBadge.isDrop ? (
+                          <TrendingDown className="h-3 w-3" />
+                        ) : (
+                          <TrendingUp className="h-3 w-3" />
+                        )}
+                        {priceChangeBadge.isDrop ? '↓' : '↑'} {formatAbbreviatedCurrency(priceChangeBadge.amount)}
                       </span>
                     )}
                   </div>

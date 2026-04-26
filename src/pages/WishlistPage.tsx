@@ -1,11 +1,13 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Layout } from '@/components/layout/Layout'
 import { Button } from '@/components/ui/button'
 import { ItemList } from '@/components/items/ItemList'
 import { ItemForm } from '@/components/items/ItemForm'
 import { useItems } from '@/hooks/useItems'
-import { Plus } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import type { Item } from '@/types'
 
 type SortOption = 'Terbaru' | 'Penurunan Terbesar' | 'Terdekat ke Target' | 'Nama A-Z'
@@ -17,6 +19,18 @@ export function WishlistPage() {
   const [editingItem, setEditingItem] = useState<Item | undefined>()
   const [sortBy, setSortBy] = useState<SortOption>('Terbaru')
   const [filterBy, setFilterBy] = useState<FilterOption>('Semua')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<Item | null>(null)
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   useEffect(() => {
     if (items.length > 0) {
@@ -43,14 +57,36 @@ export function WishlistPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this item?')) {
-      await deleteItem(id)
+    // Find the item
+    const item = items.find(i => i.id === id)
+    if (item) {
+      setItemToDelete(item)
+      setDeleteConfirmationOpen(true)
     }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return
+    await deleteItem(itemToDelete.id)
+    setDeleteConfirmationOpen(false)
+    setItemToDelete(null)
+  }
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmationOpen(false)
+    setItemToDelete(null)
   }
 
   // Filter and sort items
   const filteredAndSortedItems = useMemo(() => {
     let filtered = items
+
+    // Apply search filter
+    if (debouncedSearch) {
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+      )
+    }
 
     // Apply filter
     if (filterBy === 'Hit Target') {
@@ -97,7 +133,7 @@ export function WishlistPage() {
     }
 
     return sorted
-  }, [items, filterBy, sortBy, priceHistoryMap])
+  }, [items, filterBy, sortBy, priceHistoryMap, debouncedSearch])
 
   return (
     <Layout title="Wishlist">
@@ -117,6 +153,24 @@ export function WishlistPage() {
 
         {/* Sort & Filter Controls */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-64">
+            <Input
+              placeholder="Cari item..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pr-8"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
           {/* Sort Dropdown */}
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium">Sort:</label>
@@ -195,6 +249,26 @@ export function WishlistPage() {
           onSubmit={handleSubmit}
           initialData={editingItem}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteConfirmationOpen} onClose={handleCancelDelete}>
+          <DialogHeader>
+            <DialogTitle>Hapus item ini?</DialogTitle>
+          </DialogHeader>
+          <DialogContent>
+            <p>
+              Semua data harga <strong>{itemToDelete?.name}</strong> akan ikut terhapus.
+            </p>
+          </DialogContent>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelDelete}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete}>
+              Hapus
+            </Button>
+          </DialogFooter>
+        </Dialog>
       </div>
     </Layout>
   )
