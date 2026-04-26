@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, Plus, Trash2, RefreshCw, Home, TrendingUp, TrendingDown, Minus, ExternalLink, Download } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Legend } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer, Legend } from 'recharts'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate, formatPriceHistoryDate } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -28,6 +28,7 @@ export function ItemDetailPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [scrapeJobStatus, setScrapeJobStatus] = useState<string | null>(null)
   const [pollingJobId, setPollingJobId] = useState<string | null>(null)
+  const [chartRange, setChartRange] = useState<'7H' | '30H' | '90H' | 'Semua'>('Semua')
 
   useEffect(() => {
     if (!id) return
@@ -130,6 +131,34 @@ export function ItemDetailPage() {
   const handleDeleteClick = (entry: PriceHistory) => {
     setEntryToDelete(entry)
     setDeleteConfirmationOpen(true)
+  }
+
+  const handleExportCSV = () => {
+    if (!item || priceHistory.length === 0) return
+
+    const headers = ['Date', 'Price', 'Source', 'Status', 'Source URL']
+    const rows = priceHistory.map(entry => [
+      formatDate(entry.scraped_at),
+      entry.price.toString(),
+      entry.source,
+      entry.status,
+      entry.source_url || ''
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${item.name.replace(/[^a-z0-9]/gi, '_')}-price-history.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const handleConfirmDelete = async () => {
@@ -278,10 +307,23 @@ export function ItemDetailPage() {
   const percentChange = firstPrice > 0 ? ((latestPrice - firstPrice) / firstPrice) * 100 : 0
 
   // Prepare chart data
-  const chartData = priceHistory.map(h => ({
-    date: h.scraped_at,
-    price: h.price,
-  }))
+  const filteredChartData = useMemo(() => {
+    let data = priceHistory.map(h => ({
+      date: h.scraped_at,
+      price: h.price,
+    }))
+
+    if (chartRange !== 'Semua') {
+      const now = new Date()
+      const daysAgo = chartRange === '7H' ? 7 : chartRange === '30H' ? 30 : 90
+      const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000)
+      data = data.filter(h => new Date(h.date) >= cutoffDate)
+    }
+
+    return data
+  }, [priceHistory, chartRange])
+
+  const chartData = filteredChartData
 
   // Last 10 entries for table
   const recentHistory = priceHistory.slice(-10).reverse()
@@ -370,6 +412,10 @@ export function ItemDetailPage() {
                     {scrapeJobStatus === 'pending' ? 'Scraping...' : scrapeJobStatus}
                   </span>
                 )}
+                <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={priceHistory.length === 0}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
                 <Button onClick={handleOpenManualPriceDialog}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Price
@@ -456,6 +502,14 @@ export function ItemDetailPage() {
                           label="Target"
                         />
                       )}
+                      {item.target_price && latestPrice > 0 && (
+                        <ReferenceArea
+                          y1={lowestPrice}
+                          y2={item.target_price}
+                          fill={latestPrice <= item.target_price ? '#22c55e' : '#ef4444'}
+                          fillOpacity={0.08}
+                        />
+                      )}
                       <Line
                         type="monotone"
                         dataKey="price"
@@ -466,6 +520,22 @@ export function ItemDetailPage() {
                       />
                     </LineChart>
                   </ResponsiveContainer>
+                </div>
+                {/* Chart Range Selector */}
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  {(['7H', '30H', '90H', 'Semua'] as const).map((range) => (
+                    <button
+                      key={range}
+                      onClick={() => setChartRange(range)}
+                      className={`px-4 py-2 text-sm rounded-md transition-colors ${
+                        chartRange === range
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted hover:bg-muted/80'
+                      }`}
+                    >
+                      {range}
+                    </button>
+                  ))}
                 </div>
               </CardContent>
             </Card>

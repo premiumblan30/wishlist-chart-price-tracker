@@ -53,8 +53,18 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
   }
 
   return (
-    <Card className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={handleCardClick}>
+    <Card
+      className={`overflow-hidden cursor-pointer hover:shadow-lg transition-shadow ${
+        hitTarget ? 'border-2 border-green-500 animate-pulse' : ''
+      }`}
+      onClick={handleCardClick}
+    >
       <CardContent className="p-0">
+        {hitTarget && (
+          <div className="bg-green-500 text-white text-center py-2 text-sm font-medium">
+            🎯 Target Tercapai!
+          </div>
+        )}
         <div className="flex">
           {item.image_url ? (
             <div className="w-32 h-32 flex-shrink-0 bg-muted">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Layout } from '@/components/layout/Layout'
 import { Button } from '@/components/ui/button'
 import { ItemList } from '@/components/items/ItemList'
@@ -8,10 +8,15 @@ import { Plus } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import type { Item } from '@/types'
 
+type SortOption = 'Terbaru' | 'Penurunan Terbesar' | 'Terdekat ke Target' | 'Nama A-Z'
+type FilterOption = 'Semua' | 'Tokopedia' | 'Shopee' | 'Lazada' | 'Hit Target'
+
 export function WishlistPage() {
   const { items, loading, error, createItem, updateItem, deleteItem, priceHistoryMap, fetchPriceHistoryForAllItems } = useItems()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | undefined>()
+  const [sortBy, setSortBy] = useState<SortOption>('Terbaru')
+  const [filterBy, setFilterBy] = useState<FilterOption>('Semua')
 
   useEffect(() => {
     if (items.length > 0) {
@@ -43,6 +48,57 @@ export function WishlistPage() {
     }
   }
 
+  // Filter and sort items
+  const filteredAndSortedItems = useMemo(() => {
+    let filtered = items
+
+    // Apply filter
+    if (filterBy === 'Hit Target') {
+      filtered = filtered.filter(item => {
+        const history = priceHistoryMap?.get(item.id)
+        if (!history || history.length === 0) return false
+        const latestPrice = history[history.length - 1].price
+        return item.target_price && latestPrice <= item.target_price
+      })
+    } else if (filterBy !== 'Semua') {
+      filtered = filtered.filter(item => item.marketplace.toLowerCase() === filterBy.toLowerCase())
+    }
+
+    // Apply sort
+    const sorted = [...filtered]
+    switch (sortBy) {
+      case 'Terbaru':
+        sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        break
+      case 'Penurunan Terbesar':
+        sorted.sort((a, b) => {
+          const historyA = priceHistoryMap?.get(a.id) || []
+          const historyB = priceHistoryMap?.get(b.id) || []
+          if (historyA.length < 2 || historyB.length < 2) return 0
+          const dropA = ((historyA[0].price - historyA[historyA.length - 1].price) / historyA[0].price) * 100
+          const dropB = ((historyB[0].price - historyB[historyB.length - 1].price) / historyB[0].price) * 100
+          return dropB - dropA
+        })
+        break
+      case 'Terdekat ke Target':
+        sorted.sort((a, b) => {
+          const historyA = priceHistoryMap?.get(a.id) || []
+          const historyB = priceHistoryMap?.get(b.id) || []
+          const latestA = historyA.length > 0 ? historyA[historyA.length - 1].price : 0
+          const latestB = historyB.length > 0 ? historyB[historyB.length - 1].price : 0
+          const gapA = a.target_price ? Math.abs(latestA - a.target_price) / a.target_price : Infinity
+          const gapB = b.target_price ? Math.abs(latestB - b.target_price) / b.target_price : Infinity
+          return gapA - gapB
+        })
+        break
+      case 'Nama A-Z':
+        sorted.sort((a, b) => a.name.localeCompare(b.name))
+        break
+    }
+
+    return sorted
+  }, [items, filterBy, sortBy, priceHistoryMap])
+
   return (
     <Layout title="Wishlist">
       <div className="space-y-6">
@@ -57,6 +113,42 @@ export function WishlistPage() {
             <Plus className="h-4 w-4 mr-2" />
             Add Item
           </Button>
+        </div>
+
+        {/* Sort & Filter Controls */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Sort:</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="px-3 py-2 border rounded-md bg-background text-sm"
+            >
+              <option value="Terbaru">Terbaru</option>
+              <option value="Penurunan Terbesar">Penurunan Terbesar</option>
+              <option value="Terdekat ke Target">Terdekat ke Target</option>
+              <option value="Nama A-Z">Nama A-Z</option>
+            </select>
+          </div>
+
+          {/* Filter Chips */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-sm font-medium">Filter:</label>
+            {(['Semua', 'Tokopedia', 'Shopee', 'Lazada', 'Hit Target'] as FilterOption[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => setFilterBy(option)}
+                className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                  filterBy === option
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </div>
 
         {error && (
@@ -90,7 +182,7 @@ export function WishlistPage() {
           </div>
         ) : (
           <ItemList
-            items={items}
+            items={filteredAndSortedItems}
             priceHistoryMap={priceHistoryMap}
             onEdit={handleEditItem}
             onDelete={handleDelete}
