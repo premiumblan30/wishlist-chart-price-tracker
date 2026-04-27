@@ -224,6 +224,7 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
                 className="text-sm text-primary hover:underline flex items-center gap-1"
               >
                 <ExternalLink className="h-3 w-3" />
