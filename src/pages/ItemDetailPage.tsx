@@ -703,7 +703,7 @@ export function ItemDetailPage() {
           >
             Cancel
           </Button>
-          <Button onClick={handleManualPriceSubmit} disabled={isSubmittingPrice || !manualPrice || !manualDate}>
+          <Button onClick={handleManualPriceSubmit} disabled={isSubmittingPrice}>
             {isSubmittingPrice ? 'Adding...' : 'Add Price'}
           </Button>
         </DialogFooter>
