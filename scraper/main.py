@@ -1,6 +1,7 @@
 import os
 import re
 import requests
+import json
 from supabase import create_client, Client
 from datetime import datetime
 
@@ -15,65 +16,60 @@ if not supabase_url or not supabase_key:
 supabase: Client = create_client(supabase_url, supabase_key)
 
 
-def get_tokopedia_variant_price(url: str, variant_key: str) -> float | None:
+def scrape_tokopedia_with_variant(url: str, variant_key: str) -> float | None:
     """
-    Uses Tokopedia's pdp_get_product_info API to get variant prices.
-    No browser needed — pure HTTP request.
+    Uses ScraperAPI js_scenario to click variant buttons then extract price.
     """
+    variants = [v.strip() for v in variant_key.split('|')]
+    print(f'Target variant names: {variants}')
+    
+    # Build click instructions for each variant
+    instructions = []
+    for variant in variants:
+        instructions.append({"wait_for_selector": f"button:has-text('{variant}')", "timeout": 8000})
+        instructions.append({"click": f"button:has-text('{variant}')"})
+        instructions.append({"wait": 2000})
+    
+    # Wait for price to update after clicking
+    instructions.append({"wait_for_selector": "[data-testid='lblPDPDetailProductPrice']", "timeout": 8000})
+    scenario = json.dumps({"instructions": instructions})
+    
     try:
-        # Extract product ID from URL (15-20 digit number in URL)
-        match = re.search(r'-(\d{15,20})(?:\?|$)', url)
-        if not match:
-            print(f'Cannot extract product ID from URL: {url}')
-            return None
-
-        product_id = match.group(1)
-        target_variants = [v.strip() for v in variant_key.split('|')]
-        print(f'Target variant names: {target_variants}')
-
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
-            'Accept': 'application/json',
-            'Referer': 'https://www.tokopedia.com/',
+        api_url = "http://api.scraperapi.com/"
+        params = {
+            "api_key": scraperapi_key,
+            "url": url,
+            "render_js": "true",
+            "js_scenario": scenario,
         }
-
-        # Tokopedia public product info endpoint
-        api_url = f'https://api.tokopedia.com/v2/product/{product_id}'
-        resp = requests.get(api_url, headers=headers, timeout=15)
-
+        resp = requests.get(api_url, params=params, timeout=60)
+        
         if resp.status_code != 200:
-            print(f'Tokopedia API returned status {resp.status_code}')
-            # Try alternative: scrape price from mobile page
-            mobile_url = url.replace('www.tokopedia.com', 'm.tokopedia.com')
-            resp2 = requests.get(mobile_url, headers=headers, timeout=15)
-            html = resp2.text
-
-            # Find JSON data embedded in page
-            json_match = re.search(r'"price_format":"Rp([\d.,]+)".*?"variant_name":"([^"]+)"', html)
-            if json_match:
-                price_str = json_match.group(1).replace('.', '').replace(',', '')
-                print(f'Found variant price from mobile page: {price_str}')
-                return float(price_str)
+            print(f"ScraperAPI js_scenario failed: {resp.status_code}")
             return None
-
-        data = resp.json()
-
-        # Navigate variant data
-        variants_data = data.get('data', {}).get('children', [])
-        for child in variants_data:
-            child_name = child.get('name', '')
-            # Check if all target variants match this child
-            if all(v.lower() in child_name.lower() for v in target_variants):
-                price = child.get('price', {}).get('value', 0)
-                if price:
-                    print(f'Found variant match: {child_name} = Rp{price}')
-                    return float(price)
-
-        print(f'No matching variant found for: {target_variants}')
+        
+        html = resp.text
+        
+        # Extract price from rendered HTML
+        # Try data-testid selector pattern in HTML
+        price_match = re.search(
+            r'lblPDPDetailProductPrice[^>]*>Rp\s*([\d.,]+)',
+            html
+        )
+        if not price_match:
+            # Fallback: find price in JSON-LD or meta
+            price_match = re.search(r'"price"\s*:\s*"?([\d]+)"?', html)
+        
+        if price_match:
+            price_str = price_match.group(1).replace('.', '').replace(',', '')
+            price = float(price_str)
+            print(f'Variant price via ScraperAPI js_scenario: Rp {price:,.0f}')
+            return price
+        
+        print('Price element not found in rendered HTML')
         return None
-
     except Exception as e:
-        print(f'Tokopedia API error: {e}')
+        print(f'ScraperAPI js_scenario error: {e}')
         return None
 
 
@@ -150,14 +146,14 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
     """Scrape price for an item and update price history."""
     print(f'Scraping item {item_id} from {marketplace}: {url}')
 
-    # Use variant API for Tokopedia if variant_key is provided
+    # Use variant scraping for Tokopedia if variant_key is provided
     if marketplace == 'tokopedia' and variant_key:
         print(f'Scraping variant: {variant_key} for {item_id}')
-        price = get_tokopedia_variant_price(url, variant_key)
+        price = scrape_tokopedia_with_variant(url, variant_key)
         if price:
             print(f'Variant price found: {price}')
         else:
-            print(f'Variant API failed, falling back to HTML scraping')
+            print(f'Variant scraping failed, falling back to HTML scraping')
             html = fetch_html(url)
             if html:
                 price = extract_price_tokopedia(html)
