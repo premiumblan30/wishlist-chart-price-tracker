@@ -3,8 +3,6 @@ import re
 import requests
 from supabase import create_client, Client
 from datetime import datetime
-import asyncio
-from playwright.async_api import async_playwright
 
 # Initialize Supabase client
 supabase_url = os.getenv('SUPABASE_URL')
@@ -17,60 +15,66 @@ if not supabase_url or not supabase_key:
 supabase: Client = create_client(supabase_url, supabase_key)
 
 
-async def scrape_tokopedia_with_variant(url: str, variant_key: str) -> float | None:
+def get_tokopedia_variant_price(url: str, variant_key: str) -> float | None:
     """
-    Fetches price for a specific variant combination using Playwright.
-    variant_key format: "KING|630T Egyptian" (pipe-separated variant names)
+    Uses Tokopedia's pdp_get_product_info API to get variant prices.
+    No browser needed — pure HTTP request.
     """
-    variants = [v.strip() for v in variant_key.split('|')]
-    print(f'Target variant names: {variants}')
-    
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        
-        try:
-            await page.goto(url, wait_until='domcontentloaded', timeout=30000)
-            await page.wait_for_timeout(3000)
-
-            # Click each variant button
-            for variant_name in variants:
-                try:
-                    # Find button containing the variant name text
-                    btn = page.get_by_role('button', name=variant_name, exact=True)
-                    if await btn.count() == 0:
-                        # Try partial match
-                        btn = page.locator(f'button:has-text("{variant_name}")')
-                    if await btn.count() > 0:
-                        await btn.first.click()
-                        await page.wait_for_timeout(1500)
-                        print(f'Clicked variant: {variant_name}')
-                    else:
-                        print(f'Variant button not found: {variant_name}')
-                except Exception as e:
-                    print(f'Failed to click variant {variant_name}: {e}')
-
-            # Extract price after variant selection
-            try:
-                # Tokopedia price selector
-                price_el = await page.locator('[data-testid="lblPDPDetailProductPrice"]').first.inner_text()
-                price = float(price_el.replace('Rp', '').replace('.', '').replace(',', '').strip())
-                await browser.close()
-                print(f'Variant price found: {price}')
-                return price
-            except Exception as e:
-                print(f'Price extraction failed: {e}')
-                await browser.close()
-                return None
-        except Exception as e:
-            print(f'Playwright error: {e}')
-            await browser.close()
+    try:
+        # Extract product ID from URL (15-20 digit number in URL)
+        match = re.search(r'-(\d{15,20})(?:\?|$)', url)
+        if not match:
+            print(f'Cannot extract product ID from URL: {url}')
             return None
 
+        product_id = match.group(1)
+        target_variants = [v.strip() for v in variant_key.split('|')]
+        print(f'Target variant names: {target_variants}')
 
-def get_variant_price(url: str, variant_key: str) -> float | None:
-    """Wrapper to run async Playwright function."""
-    return asyncio.run(scrape_tokopedia_with_variant(url, variant_key))
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+            'Accept': 'application/json',
+            'Referer': 'https://www.tokopedia.com/',
+        }
+
+        # Tokopedia public product info endpoint
+        api_url = f'https://api.tokopedia.com/v2/product/{product_id}'
+        resp = requests.get(api_url, headers=headers, timeout=15)
+
+        if resp.status_code != 200:
+            print(f'Tokopedia API returned status {resp.status_code}')
+            # Try alternative: scrape price from mobile page
+            mobile_url = url.replace('www.tokopedia.com', 'm.tokopedia.com')
+            resp2 = requests.get(mobile_url, headers=headers, timeout=15)
+            html = resp2.text
+
+            # Find JSON data embedded in page
+            json_match = re.search(r'"price_format":"Rp([\d.,]+)".*?"variant_name":"([^"]+)"', html)
+            if json_match:
+                price_str = json_match.group(1).replace('.', '').replace(',', '')
+                print(f'Found variant price from mobile page: {price_str}')
+                return float(price_str)
+            return None
+
+        data = resp.json()
+
+        # Navigate variant data
+        variants_data = data.get('data', {}).get('children', [])
+        for child in variants_data:
+            child_name = child.get('name', '')
+            # Check if all target variants match this child
+            if all(v.lower() in child_name.lower() for v in target_variants):
+                price = child.get('price', {}).get('value', 0)
+                if price:
+                    print(f'Found variant match: {child_name} = Rp{price}')
+                    return float(price)
+
+        print(f'No matching variant found for: {target_variants}')
+        return None
+
+    except Exception as e:
+        print(f'Tokopedia API error: {e}')
+        return None
 
 
 def extract_price_tokopedia(html: str) -> float | None:
@@ -146,14 +150,14 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
     """Scrape price for an item and update price history."""
     print(f'Scraping item {item_id} from {marketplace}: {url}')
 
-    # Use variant scraping for Tokopedia if variant_key is provided
+    # Use variant API for Tokopedia if variant_key is provided
     if marketplace == 'tokopedia' and variant_key:
         print(f'Scraping variant: {variant_key} for {item_id}')
-        price = get_variant_price(url, variant_key)
+        price = get_tokopedia_variant_price(url, variant_key)
         if price:
             print(f'Variant price found: {price}')
         else:
-            print(f'Variant scraping failed, falling back to HTML scraping')
+            print(f'Variant API failed, falling back to HTML scraping')
             html = fetch_html(url)
             if html:
                 price = extract_price_tokopedia(html)
