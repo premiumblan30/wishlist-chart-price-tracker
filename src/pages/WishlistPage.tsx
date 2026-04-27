@@ -246,10 +246,11 @@ export function WishlistPage() {
         )}
 
         <ItemForm
+          key={editingItem?.id ?? "new"}
           open={isFormOpen}
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleSubmit}
-          initialData={editingItem}
+          initialData={editingItem ?? undefined}
         />
 
         {/* Delete Confirmation Dialog */}
