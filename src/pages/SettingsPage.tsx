@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
-import { User, Bell, ShieldAlert, Mail, TrendingDown, Target } from 'lucide-react'
+import { User, Bell, ShieldAlert, Mail, TrendingDown, Target, Clock } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -17,6 +17,20 @@ export function SettingsPage() {
   const [alertOnTarget, setAlertOnTarget] = useState(true)
   const [dropThreshold, setDropThreshold] = useState(5)
   const [loading, setLoading] = useState(false)
+  const [scrapeInterval, setScrapeInterval] = useState('6')
+  const [autoScrapeEnabled, setAutoScrapeEnabled] = useState(true)
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
+
+  const getCronExpression = (hours: string): string => {
+    const map: Record<string, string> = {
+      '1': '0 * * * *',
+      '3': '0 */3 * * *',
+      '6': '0 */6 * * *',
+      '12': '0 */12 * * *',
+      '24': '0 0 * * *',
+    }
+    return map[hours] ?? '0 */6 * * *'
+  }
 
   // Load existing settings on mount
   useEffect(() => {
@@ -36,7 +50,49 @@ export function SettingsPage() {
       }
     }
     loadAlertSettings()
+
+    async function loadUserPreferences() {
+      if (!user) return
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+
+      if (data && !error) {
+        setScrapeInterval(data.scrape_interval_hours?.toString() ?? '6')
+        setAutoScrapeEnabled(data.auto_scrape_enabled ?? true)
+      }
+    }
+    loadUserPreferences()
   }, [user])
+
+  async function handleSaveSchedule() {
+    setIsSavingSchedule(true)
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) {
+        toast.error('User not authenticated')
+        return
+      }
+
+      const { error } = await supabase
+        .from('user_preferences')
+        .upsert({
+          user_id: authUser.id,
+          scrape_interval_hours: parseInt(scrapeInterval),
+          auto_scrape_enabled: autoScrapeEnabled,
+        }, { onConflict: 'user_id' })
+
+      if (error) throw error
+      toast.success('Schedule berhasil disimpan')
+    } catch (err) {
+      console.error('Failed to save schedule settings:', err)
+      toast.error('Gagal menyimpan schedule')
+    } finally {
+      setIsSavingSchedule(false)
+    }
+  }
 
   async function handleSave() {
     setLoading(true)
@@ -178,6 +234,65 @@ export function SettingsPage() {
                 {loading ? 'Saving...' : 'Save Alert Settings'}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Scraping Schedule Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              <div>
+                <CardTitle>Scraping Schedule</CardTitle>
+                <CardDescription>
+                  Atur seberapa sering harga di-update otomatis
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Interval Selector */}
+            <div className="space-y-2">
+              <Label htmlFor="scrapeInterval">Interval scraping otomatis</Label>
+              <select
+                id="scrapeInterval"
+                value={scrapeInterval}
+                onChange={(e) => setScrapeInterval(e.target.value)}
+                className="flex h-10 w-[280px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="1">Setiap 1 jam</option>
+                <option value="3">Setiap 3 jam</option>
+                <option value="6">Setiap 6 jam (default)</option>
+                <option value="12">Setiap 12 jam</option>
+                <option value="24">Setiap 24 jam</option>
+              </select>
+              <p className="text-sm text-muted-foreground">
+                GitHub Actions akan berjalan sesuai interval ini
+              </p>
+            </div>
+
+            {/* Info cron expression */}
+            <div className="rounded-md bg-muted px-4 py-3 text-sm font-mono text-muted-foreground">
+              Cron: {getCronExpression(scrapeInterval)}
+            </div>
+
+            {/* Scraping aktif/nonaktif */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Auto-scraping aktif</p>
+                <p className="text-sm text-muted-foreground">
+                  Nonaktifkan untuk pause semua scraping otomatis
+                </p>
+              </div>
+              <Switch
+                checked={autoScrapeEnabled}
+                onCheckedChange={setAutoScrapeEnabled}
+              />
+            </div>
+
+            <Button onClick={handleSaveSchedule} disabled={isSavingSchedule}>
+              {isSavingSchedule ? 'Menyimpan...' : 'Save Schedule Settings'}
+            </Button>
           </CardContent>
         </Card>
 
