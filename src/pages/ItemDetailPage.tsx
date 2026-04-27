@@ -22,6 +22,7 @@ export function ItemDetailPage() {
   const [isManualPriceDialogOpen, setIsManualPriceDialogOpen] = useState(false)
   const [manualPrice, setManualPrice] = useState('')
   const [manualDate, setManualDate] = useState('')
+  const [priceError, setPriceError] = useState('')
   const [isSubmittingPrice, setIsSubmittingPrice] = useState(false)
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
   const [entryToDelete, setEntryToDelete] = useState<PriceHistory | null>(null)
@@ -66,16 +67,17 @@ export function ItemDetailPage() {
 
   const handleManualPriceSubmit = async () => {
     if (!id || !manualPrice || !manualDate) {
-      toast.error('Harga harus diisi')
+      if (!manualPrice) setPriceError('Harga harus diisi')
       return
     }
 
     try {
       setIsSubmittingPrice(true)
+      setPriceError('')
 
       const priceValue = parseFloat(manualPrice)
       if (isNaN(priceValue) || priceValue <= 0) {
-        toast.error('Harga tidak valid')
+        setPriceError('Harga harus lebih dari Rp 0')
         return
       }
 
@@ -126,6 +128,7 @@ export function ItemDetailPage() {
     // Set default date to today
     const today = new Date().toISOString().split('T')[0]
     setManualDate(today)
+    setPriceError('')
     setIsManualPriceDialogOpen(true)
   }
 
@@ -668,10 +671,15 @@ export function ItemDetailPage() {
                 id="manual-price"
                 type="number"
                 value={manualPrice}
-                onChange={(e) => setManualPrice(e.target.value)}
+                onChange={(e) => {
+                  setManualPrice(e.target.value)
+                  setPriceError('')
+                }}
                 placeholder="e.g. 150000"
                 min="1"
+                className={priceError ? 'border-red-500' : ''}
               />
+              {priceError && <p className="text-sm text-red-500 mt-1">{priceError}</p>}
             </div>
           </div>
         </DialogContent>
@@ -681,6 +689,7 @@ export function ItemDetailPage() {
             onClick={() => {
               setIsManualPriceDialogOpen(false)
               setManualDate('')
+              setPriceError('')
             }}
             disabled={isSubmittingPrice}
           >
