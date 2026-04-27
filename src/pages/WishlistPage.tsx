@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ItemList } from '@/components/items/ItemList'
 import { ItemForm } from '@/components/items/ItemForm'
 import { useItems } from '@/hooks/useItems'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, ShoppingBag, Search } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -244,6 +244,27 @@ export function WishlistPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        ) : items.length === 0 && !debouncedSearch ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <ShoppingBag className="h-16 w-16 text-muted-foreground mb-4 opacity-40" />
+            <h3 className="text-lg font-semibold mb-2">Wishlist kamu masih kosong</h3>
+            <p className="text-muted-foreground text-sm mb-6 max-w-sm">
+              Mulai tambahkan produk dari Tokopedia, Shopee, atau marketplace lainnya untuk melacak harganya.
+            </p>
+            <Button onClick={handleAddItem}>
+              + Tambah Item Pertama
+            </Button>
+          </div>
+        ) : filteredAndSortedItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Search className="h-12 w-12 text-muted-foreground mb-3 opacity-40" />
+            <p className="text-muted-foreground">
+              Tidak ada item ditemukan untuk <span className="font-medium text-foreground">"{searchQuery}"</span>
+            </p>
+            <button onClick={() => setSearchQuery('')} className="text-sm text-primary mt-2 hover:underline">
+              Hapus pencarian
+            </button>
           </div>
         ) : (
           <ItemList

@@ -16,6 +16,7 @@ export function SettingsPage() {
   const [alertOnDrop, setAlertOnDrop] = useState(true)
   const [alertOnTarget, setAlertOnTarget] = useState(true)
   const [dropThreshold, setDropThreshold] = useState(5)
+  const [dropThresholdError, setDropThresholdError] = useState('')
   const [loading, setLoading] = useState(false)
   const [scrapeInterval, setScrapeInterval] = useState('6')
   const [autoScrapeEnabled, setAutoScrapeEnabled] = useState(true)
@@ -222,15 +223,26 @@ export function SettingsPage() {
                 min="1"
                 max="100"
                 value={dropThreshold}
-                onChange={(e) => setDropThreshold(Number(e.target.value))}
-                className="w-full max-w-xs"
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+                  setDropThreshold(value)
+                  if (value < 1 || value > 100 || e.target.value === '') {
+                    setDropThresholdError('Harus antara 1-100%')
+                  } else {
+                    setDropThresholdError('')
+                  }
+                }}
+                className={`w-full max-w-xs ${dropThresholdError ? 'border-red-500' : ''}`}
               />
+              {dropThresholdError && (
+                <p className="text-sm text-red-500">{dropThresholdError}</p>
+              )}
               <p className="text-sm text-muted-foreground">
                 Minimum percentage drop to trigger notification (default 5%)
               </p>
             </div>
             <div className="pt-4">
-              <Button onClick={handleSave} disabled={loading}>
+              <Button onClick={handleSave} disabled={loading || !!dropThresholdError}>
                 {loading ? 'Saving...' : 'Save Alert Settings'}
               </Button>
             </div>
