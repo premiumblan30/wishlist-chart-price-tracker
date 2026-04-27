@@ -96,7 +96,13 @@ export function formatDate(date: string): string {
 
 export function formatPriceHistoryDate(dateStr: string): string {
   const date = new Date(dateStr)
-  return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: '2-digit' })
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 export function formatDistanceToNow(dateStr: string): string {

@@ -30,9 +30,14 @@ export function RegisterForm() {
     setLoading(true)
 
     const { error } = await register(email, password)
-    
+
     if (error) {
-      setError(error.message)
+      // Map Supabase error message to user-friendly Indonesian message
+      if (error.message === 'User already registered') {
+        setError('Email sudah terdaftar. Silakan gunakan email lain atau login.')
+      } else {
+        setError(error.message)
+      }
       setLoading(false)
     }
   }
