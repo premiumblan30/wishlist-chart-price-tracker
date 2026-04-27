@@ -667,6 +667,7 @@ export function ItemDetailPage() {
                 value={manualPrice}
                 onChange={(e) => setManualPrice(e.target.value)}
                 placeholder="e.g. 150000"
+                min="1"
               />
             </div>
           </div>

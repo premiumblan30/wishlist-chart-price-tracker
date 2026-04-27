@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,6 +12,16 @@ import {
 } from '@/components/ui/dialog'
 import { detectMarketplace } from '@/lib/utils'
 import type { Marketplace, Item } from '@/types'
+
+const itemSchema = z.object({
+  name: z.string().min(1, 'Nama item wajib diisi'),
+  url: z.string().url('URL tidak valid'),
+  marketplace: z.enum(['shopee', 'tokopedia', 'lazada', 'blibli', 'official', 'other']),
+  target_price: z.number().positive('Harga harus lebih dari 0').optional(),
+  image_url: z.string().url('URL gambar tidak valid').optional(),
+  notes: z.string().optional(),
+  variant_key: z.string().optional(),
+})
 
 interface ItemFormProps {
   open: boolean
@@ -27,6 +38,7 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
   const [imageUrl, setImageUrl] = useState('')
   const [notes, setNotes] = useState('')
   const [variantKey, setVariantKey] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (initialData) {
@@ -56,6 +68,28 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Validate with zod
+    const result = itemSchema.safeParse({
+      name,
+      url,
+      marketplace,
+      target_price: targetPrice,
+      image_url: imageUrl || undefined,
+      notes: notes || undefined,
+      variant_key: variantKey || undefined,
+    })
+    
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {}
+      result.error.issues.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[err.path[0] as string] = err.message
+        }
+      })
+      setErrors(fieldErrors)
+      return
+    }
+    
     onSubmit({
       name,
       url,
@@ -68,6 +102,7 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
       variant_key: variantKey || undefined,
     })
     
+    setErrors({})
     onClose()
   }
 
@@ -127,7 +162,11 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
                 value={targetPrice || ''}
                 onChange={(e) => setTargetPrice(e.target.value ? Number(e.target.value) : undefined)}
                 placeholder="1500000"
+                min="1"
               />
+              {errors.target_price && (
+                <p className="text-sm text-red-500">{errors.target_price}</p>
+              )}
             </div>
             
             <div className="space-y-2">

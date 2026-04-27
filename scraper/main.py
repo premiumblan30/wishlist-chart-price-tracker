@@ -179,6 +179,25 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
             'error': 'Could not extract price',
         }
 
+    # Validate price is positive
+    if price <= 0:
+        print(f'Invalid price {price} for item {item_id}, skipping insert')
+        # Insert with status='failed' instead of skipping silently
+        try:
+            supabase.table('price_history').insert({
+                'item_id': item_id,
+                'price': None,
+                'source': 'cron',
+                'status': 'failed',
+                'scraped_at': datetime.utcnow().isoformat()
+            }).execute()
+        except Exception as e:
+            print(f'Failed to insert failed status: {e}')
+        return {
+            'success': False,
+            'error': f'Invalid price: {price}',
+        }
+
     # Insert price history
     try:
         supabase.table('price_history').insert({
