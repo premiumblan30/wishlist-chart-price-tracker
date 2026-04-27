@@ -155,6 +155,7 @@ export function useItems() {
         .from('price_history')
         .select('*')
         .in('item_id', items.map(item => item.id))
+        .eq('status', 'success')
         .order('scraped_at', { ascending: false })
 
       if (error) throw error

@@ -22,11 +22,16 @@ export function DashboardPage() {
   const totalItems = items.length
 
   // Calculate avg price drop for items with price history
+  const itemsWithPriceData = items.filter(item => {
+    const history = priceHistoryMap?.get(item.id) ?? []
+    return history.length >= 2; // butuh min 2 titik untuk hitung perubahan
+  })
+
   let totalDrop = 0
   let itemsWithHistory = 0
-  items.forEach(item => {
-    const history = priceHistoryMap?.get(item.id)
-    if (history && history.length > 0) {
+  itemsWithPriceData.forEach(item => {
+    const history = priceHistoryMap?.get(item.id) ?? []
+    if (history.length >= 2) {
       const firstPrice = history[history.length - 1].price
       const latestPrice = history[0].price
       if (firstPrice > 0) {
@@ -43,14 +48,10 @@ export function DashboardPage() {
   items.forEach(item => {
     const history = priceHistoryMap?.get(item.id)
     if (history && history.length > 0) {
-      // Filter only successful price history entries
-      const successfulHistory = history.filter(h => h.status === 'success')
-      if (successfulHistory.length > 0) {
-        // Get the latest price (first entry since ordered by scraped_at DESC)
-        const latestPrice = successfulHistory[0].price
-        if (isHitTarget(item, latestPrice)) {
-          itemsHitTarget++
-        }
+      // Get the latest price (first entry since ordered by scraped_at DESC)
+      const latestPrice = history[0].price
+      if (isHitTarget(item.target_price, latestPrice)) {
+        itemsHitTarget++
       }
     }
   })

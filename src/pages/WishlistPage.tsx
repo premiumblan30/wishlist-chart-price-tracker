@@ -94,12 +94,9 @@ export function WishlistPage() {
       filtered = filtered.filter(item => {
         const history = priceHistoryMap?.get(item.id)
         if (!history || history.length === 0) return false
-        // Filter only successful price history entries
-        const successfulHistory = history.filter(h => h.status === 'success')
-        if (successfulHistory.length === 0) return false
         // Get the latest price (first entry since ordered by scraped_at DESC)
-        const latestPrice = successfulHistory[0].price
-        return isHitTarget(item, latestPrice)
+        const latestPrice = history[0].price
+        return isHitTarget(item.target_price, latestPrice)
       })
     } else if (filterBy !== 'Semua') {
       filtered = filtered.filter(item => item.marketplace.toLowerCase() === filterBy.toLowerCase())

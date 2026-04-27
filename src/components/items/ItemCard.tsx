@@ -27,7 +27,7 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
   // Calculate badges
   const latestPrice = priceHistory && priceHistory.length > 0 ? priceHistory[0].price : displayPrice
   const firstPrice = priceHistory && priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].price : displayPrice
-  const hitTarget = isHitTarget(item, latestPrice)
+  const hitTarget = isHitTarget(item.target_price, latestPrice)
   const priceDrop = firstPrice > 0 ? ((firstPrice - latestPrice) / firstPrice) * 100 : 0
   const significantDrop = priceDrop >= 5
 

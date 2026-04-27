@@ -568,7 +568,7 @@ export function ItemDetailPage() {
           {/* Price History Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Price History</CardTitle>
+              <CardTitle>Price Log <span>(10 entri terakhir)</span></CardTitle>
               <CardDescription>Last 10 entries</CardDescription>
             </CardHeader>
             <CardContent>

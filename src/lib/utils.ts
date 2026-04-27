@@ -47,10 +47,13 @@ export function formatIDR(price: number | null | undefined): string {
   }).format(price)
 }
 
-export function isHitTarget(item: Item, latestPrice: number | null): boolean {
-  if (!item.target_price || latestPrice === null) return false
-  return latestPrice <= item.target_price
-}
+export const isHitTarget = (
+  targetPrice: number | null | undefined,
+  latestPrice: number | null | undefined
+): boolean => {
+  if (!targetPrice || !latestPrice) return false;
+  return latestPrice <= targetPrice;
+};
 
 export function getMarketplaceBadgeColor(marketplace: Marketplace): string {
   const colors = {
