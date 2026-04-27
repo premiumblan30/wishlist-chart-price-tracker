@@ -78,6 +78,7 @@ serve(async (req) => {
         item_id,
         status: 'pending',
         triggered_by: 'manual',
+        scheduled_at: new Date().toISOString(),
       })
       .select()
       .single()
