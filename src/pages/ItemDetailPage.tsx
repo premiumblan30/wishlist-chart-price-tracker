@@ -364,7 +364,7 @@ export function ItemDetailPage() {
           </Card>
 
           {/* Skeleton Stats */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
             {[1, 2, 3, 4].map((i) => (
               <Card key={i}>
                 <CardHeader className="pb-2">
@@ -569,7 +569,7 @@ export function ItemDetailPage() {
 
           {/* Stats Row */}
           {priceHistory.length > 0 && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">Lowest Price</CardTitle>

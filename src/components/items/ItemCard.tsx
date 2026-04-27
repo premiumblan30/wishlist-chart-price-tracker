@@ -235,7 +235,7 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-11 w-11"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleManualRefresh()
@@ -247,7 +247,7 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-11 w-11"
                   onClick={handleEditClick}
                 >
                   <Edit className="h-4 w-4" />
@@ -255,7 +255,7 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  className="h-11 w-11 text-destructive hover:text-destructive"
                   onClick={handleDeleteClick}
                 >
                   <Trash2 className="h-4 w-4" />
