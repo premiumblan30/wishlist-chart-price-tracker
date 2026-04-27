@@ -40,6 +40,15 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
   const [variantKey, setVariantKey] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const urlPlaceholders: Record<string, string> = {
+    tokopedia: "https://www.tokopedia.com/store/product-name",
+    shopee: "https://shopee.co.id/product-name-i.123.456",
+    lazada: "https://www.lazada.co.id/products/product-name.html",
+    blibli: "https://www.blibli.com/p/product-name/pc--123",
+    official: "https://www.example.com/product",
+    other: "https://",
+  }
+
   useEffect(() => {
     if (initialData) {
       setName(initialData.name)
@@ -133,7 +142,7 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
                 type="url"
                 value={url}
                 onChange={(e) => handleUrlChange(e.target.value)}
-                placeholder="https://shopee.co.id/product/..."
+                placeholder={urlPlaceholders[marketplace] ?? "https://"}
                 required
               />
             </div>

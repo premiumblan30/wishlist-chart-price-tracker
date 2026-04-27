@@ -150,7 +150,10 @@ export function WishlistPage() {
           <div>
             <h2 className="text-2xl font-bold">My Wishlist</h2>
             <p className="text-muted-foreground">
-              {items.length} {items.length === 1 ? 'item' : 'items'} in your wishlist
+              {filteredAndSortedItems.length !== items.length
+                ? `${filteredAndSortedItems.length} dari ${items.length} items`
+                : `${items.length} ${items.length === 1 ? 'item' : 'items'} in your wishlist`
+              }
             </p>
           </div>
           <Button onClick={handleAddItem}>

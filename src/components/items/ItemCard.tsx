@@ -202,9 +202,11 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
 
                 {item.target_price && (
                   <>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Target:</span>
-                      <span className="font-medium">{formatIDR(item.target_price)}</span>
+                    <div className="flex items-baseline gap-1 min-w-0">
+                      <span className="text-sm text-muted-foreground shrink-0">Target:</span>
+                      <span className="text-sm font-medium truncate">
+                        {formatIDR(item.target_price)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Gap:</span>
