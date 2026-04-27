@@ -18,6 +18,7 @@ export function WishlistPage() {
   const { items, loading, error, createItem, updateItem, deleteItem, priceHistoryMap, fetchPriceHistoryForAllItems } = useItems()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | undefined>()
+  const [modalKey, setModalKey] = useState(0)
   const [sortBy, setSortBy] = useState<SortOption>('Terbaru')
   const [filterBy, setFilterBy] = useState<FilterOption>('Semua')
   const [searchQuery, setSearchQuery] = useState('')
@@ -41,11 +42,13 @@ export function WishlistPage() {
 
   const handleAddItem = () => {
     setEditingItem(undefined)
+    setModalKey(prev => prev + 1)
     setIsFormOpen(true)
   }
 
   const handleEditItem = (item: Item) => {
     setEditingItem(item)
+    setModalKey(prev => prev + 1)
     setIsFormOpen(true)
   }
 
@@ -246,7 +249,7 @@ export function WishlistPage() {
         )}
 
         <ItemForm
-          key={editingItem?.id ?? "new-item"}
+          key={modalKey}
           open={isFormOpen}
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleSubmit}
