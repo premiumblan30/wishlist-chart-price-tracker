@@ -3,6 +3,8 @@ import re
 import requests
 from supabase import create_client, Client
 from datetime import datetime
+import asyncio
+from playwright.async_api import async_playwright
 
 # Initialize Supabase client
 supabase_url = os.getenv('SUPABASE_URL')
@@ -15,95 +17,60 @@ if not supabase_url or not supabase_key:
 supabase: Client = create_client(supabase_url, supabase_key)
 
 
-def get_tokopedia_variant_price(product_url: str, variant_key: str) -> float | None:
+async def scrape_tokopedia_with_variant(url: str, variant_key: str) -> float | None:
     """
-    Fetches price for a specific variant combination using Tokopedia's
-    internal pdpGetLayout GraphQL API.
+    Fetches price for a specific variant combination using Playwright.
     variant_key format: "KING|630T Egyptian" (pipe-separated variant names)
     """
-    headers = {
-        'User-Agent': 'Mozilla/5.0',
-        'Content-Type': 'application/json',
-        'X-Source': 'tokopedia-lite',
-    }
-    # Extract shop domain and product slug from URL
-    parts = product_url.rstrip('/').split('/')
-    if len(parts) < 2:
-        return None
-    shop_domain = parts[-2]
-    product_slug = parts[-1].split('?')[0]
+    variants = [v.strip() for v in variant_key.split('|')]
+    print(f'Target variant names: {variants}')
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        
+        try:
+            await page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            await page.wait_for_timeout(3000)
 
-    payload = {
-        "operationName": "PDPGetLayout",
-        "variables": {
-            "shopDomain": shop_domain,
-            "productKey": product_slug,
-            "layoutID": "",
-            "apiVersion": 1,
-            "tokonow": {"shopID": "0", "whID": "0", "serviceType": ""}
-        },
-        "query": """
-        query PDPGetLayout($shopDomain: String, $productKey: String) {
-          pdpGetLayout(shopDomain: $shopDomain, productKey: $productKey) {
-            basicInfo {
-              id alias
-            }
-            data {
-              ... on PDPDataProductVariant {
-                errorCode
-                products {
-                  price { value }
-                  isBuyable
-                  combination
-                  optionIds
-                }
-                variants {
-                  identifier
-                  option { id value }
-                }
-              }
-            }
-          }
-        }
-        """
-    }
+            # Click each variant button
+            for variant_name in variants:
+                try:
+                    # Find button containing the variant name text
+                    btn = page.get_by_role('button', name=variant_name, exact=True)
+                    if await btn.count() == 0:
+                        # Try partial match
+                        btn = page.locator(f'button:has-text("{variant_name}")')
+                    if await btn.count() > 0:
+                        await btn.first.click()
+                        await page.wait_for_timeout(1500)
+                        print(f'Clicked variant: {variant_name}')
+                    else:
+                        print(f'Variant button not found: {variant_name}')
+                except Exception as e:
+                    print(f'Failed to click variant {variant_name}: {e}')
 
-    try:
-        resp = requests.post(
-            'https://gql.tokopedia.com/',
-            json=payload,
-            headers=headers,
-            timeout=15
-        )
-        data = resp.json()
-        layout = data.get('data', {}).get('pdpGetLayout', {}).get('data', [])
-        # Find variant section
-        variant_data = next((d for d in layout if d.get('products')), None)
-        if not variant_data:
+            # Extract price after variant selection
+            try:
+                # Tokopedia price selector
+                price_el = await page.locator('[data-testid="lblPDPDetailProductPrice"]').first.inner_text()
+                price = float(price_el.replace('Rp', '').replace('.', '').replace(',', '').strip())
+                await browser.close()
+                print(f'Variant price found: {price}')
+                return price
+            except Exception as e:
+                print(f'Price extraction failed: {e}')
+                await browser.close()
+                return None
+        except Exception as e:
+            print(f'Playwright error: {e}')
+            await browser.close()
             return None
 
-        variants = variant_data.get('variants', [])
-        target_names = [v.strip() for v in variant_key.split('|')]
-        print(f'Target variant names: {target_names}')
 
-        # Build option_id lookup: name -> id
-        name_to_id = {}
-        for variant in variants:
-            for opt in variant.get('option', []):
-                name_to_id[opt['value'].strip()] = str(opt['id'])
-        print(f'Available options: {name_to_id}')
-
-        target_ids = set(name_to_id.get(n) for n in target_names if name_to_id.get(n))
-        print(f'Target IDs: {target_ids}')
-
-        # Find product where all target option IDs are in its combination
-        for product in variant_data.get('products', []):
-            combo = set(str(x) for x in product.get('optionIds', []))
-            if target_ids and target_ids.issubset(combo) and product.get('isBuyable'):
-                return float(product['price']['value'])
-    except Exception as e:
-        print(f'Variant API error: {e}')
-    return None
+def get_variant_price(url: str, variant_key: str) -> float | None:
+    """Wrapper to run async Playwright function."""
+    return asyncio.run(scrape_tokopedia_with_variant(url, variant_key))
 
 
 def extract_price_tokopedia(html: str) -> float | None:
@@ -179,14 +146,14 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
     """Scrape price for an item and update price history."""
     print(f'Scraping item {item_id} from {marketplace}: {url}')
 
-    # Use variant API for Tokopedia if variant_key is provided
+    # Use variant scraping for Tokopedia if variant_key is provided
     if marketplace == 'tokopedia' and variant_key:
         print(f'Scraping variant: {variant_key} for {item_id}')
-        price = get_tokopedia_variant_price(url, variant_key)
+        price = get_variant_price(url, variant_key)
         if price:
             print(f'Variant price found: {price}')
         else:
-            print(f'Variant API failed, falling back to HTML scraping')
+            print(f'Variant scraping failed, falling back to HTML scraping')
             html = fetch_html(url)
             if html:
                 price = extract_price_tokopedia(html)
