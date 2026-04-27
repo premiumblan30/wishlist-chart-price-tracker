@@ -246,7 +246,7 @@ export function WishlistPage() {
         )}
 
         <ItemForm
-          key={editingItem?.id ?? "new"}
+          key={editingItem?.id ?? "new-item"}
           open={isFormOpen}
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleSubmit}

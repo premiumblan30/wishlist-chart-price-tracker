@@ -66,8 +66,16 @@ export function ItemDetailPage() {
   }, [id])
 
   const handleManualPriceSubmit = async () => {
-    if (!id || !manualPrice || !manualDate) {
-      if (!manualPrice) setPriceError('Harga harus diisi')
+    if (!id) return
+
+    // Validate price first
+    if (!manualPrice || manualPrice.trim() === '') {
+      setPriceError('Harga harus diisi')
+      return
+    }
+
+    if (!manualDate) {
+      toast.error('Tanggal harus diisi')
       return
     }
 
