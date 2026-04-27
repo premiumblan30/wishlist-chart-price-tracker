@@ -28,6 +28,7 @@ export function ItemDetailPage() {
   const [entryToDelete, setEntryToDelete] = useState<PriceHistory | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [chartRange, setChartRange] = useState<'7H' | '30H' | '90H' | 'Semua'>('Semua')
+  const [deletedEntry, setDeletedEntry] = useState<{ entry: PriceHistory, timestamp: number } | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -184,7 +185,15 @@ export function ItemDetailPage() {
 
       if (error) throw error
 
-      toast.success('Data harga berhasil dihapus')
+      // Store deleted entry for undo
+      setDeletedEntry({ entry: entryToDelete, timestamp: Date.now() })
+
+      toast.success('Harga dihapus', {
+        action: {
+          label: 'Undo',
+          onClick: () => handleUndoDelete()
+        }
+      })
       setDeleteConfirmationOpen(false)
       setEntryToDelete(null)
 
@@ -200,6 +209,34 @@ export function ItemDetailPage() {
     } catch (err) {
       console.error('Failed to delete price history:', err)
       toast.error('Gagal menghapus data harga')
+    }
+  }
+
+  const handleUndoDelete = async () => {
+    if (!deletedEntry || !id) return
+
+    try {
+      const { error } = await supabase
+        .from('price_history')
+        .insert(deletedEntry.entry)
+
+      if (error) throw error
+
+      toast.success('Data harga dipulihkan')
+      setDeletedEntry(null)
+
+      // Re-fetch price history
+      const { data: historyData, error: historyError } = await supabase
+        .from('price_history')
+        .select('*')
+        .eq('item_id', id)
+        .order('scraped_at', { ascending: true })
+
+      if (historyError) throw historyError
+      setPriceHistory(historyData || [])
+    } catch (err) {
+      console.error('Failed to undo delete:', err)
+      toast.error('Gagal memulihkan data harga')
     }
   }
 
