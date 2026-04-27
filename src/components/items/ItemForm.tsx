@@ -162,7 +162,7 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
                 type="number"
                 value={targetPrice || ''}
                 onChange={(e) => setTargetPrice(e.target.value ? Number(e.target.value) : undefined)}
-                placeholder="1500000"
+                placeholder="e.g. 1500000"
                 min="1"
               />
               {errors.target_price && (
@@ -177,7 +177,7 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
                 type="url"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://example.com/image.jpg"
+                placeholder="e.g. https://example.com/image.jpg"
               />
             </div>
             
@@ -195,10 +195,10 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
             <div className="space-y-2">
               <Label htmlFor="variantKey">Varian (opsional)</Label>
               <Input
-                id="variantKey"
+                type="text"
                 value={variantKey}
                 onChange={(e) => setVariantKey(e.target.value)}
-                placeholder="KING|630T Egyptian"
+                placeholder="e.g. KING|630T Egyptian"
                 className="mb-1"
               />
               <p className="text-xs text-muted-foreground">
