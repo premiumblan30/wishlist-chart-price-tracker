@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { Layout } from '@/components/layout/Layout'
 import { Button } from '@/components/ui/button'
 import { ItemList } from '@/components/items/ItemList'
@@ -41,7 +42,9 @@ export function WishlistPage() {
   }, [items, fetchPriceHistoryForAllItems])
 
   const handleAddItem = () => {
-    setEditingItem(undefined)
+    flushSync(() => {
+      setEditingItem(null)
+    })
     setModalKey(prev => prev + 1)
     setIsFormOpen(true)
   }
