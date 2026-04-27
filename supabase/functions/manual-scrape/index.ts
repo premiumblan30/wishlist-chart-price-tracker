@@ -77,7 +77,7 @@ serve(async (req) => {
       .insert({
         item_id,
         status: 'pending',
-        scheduled_at: new Date().toISOString(),
+        triggered_by: 'manual',
       })
       .select()
       .single()

@@ -1,10 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Edit, Trash2, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react'
+import { Edit, Trash2, ExternalLink, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { LineChart, Line } from 'recharts'
 import { formatIDR, getMarketplaceBadgeColor, calculatePriceGap, formatRelativeTime, formatAbbreviatedCurrency, isHitTarget } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
 import type { Item, PriceHistory } from '@/types'
 
 interface ItemCardProps {
@@ -17,6 +19,7 @@ interface ItemCardProps {
 
 export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }: ItemCardProps) {
   const navigate = useNavigate()
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const badgeColor = getMarketplaceBadgeColor(item.marketplace)
   const displayPrice = currentPrice || item.target_price || 0
   const priceGap = item.target_price ? calculatePriceGap(displayPrice, item.target_price) : 0
@@ -72,6 +75,30 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onDelete(item.id)
+  }
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manual-scrape`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ item_id: item.id }),
+        }
+      )
+      if (!res.ok) throw new Error('Scrape failed')
+      toast.success('Scraping dijadwalkan, harga akan update dalam beberapa saat')
+    } catch {
+      toast.error('Gagal memulai scraping')
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   return (
@@ -201,6 +228,18 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
               </a>
 
               <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleManualRefresh()
+                  }}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"

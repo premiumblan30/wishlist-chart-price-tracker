@@ -4,6 +4,7 @@ import requests
 import json
 from supabase import create_client, Client
 from datetime import datetime
+from bs4 import BeautifulSoup
 
 # Initialize Supabase client
 supabase_url = os.getenv('SUPABASE_URL')
@@ -71,6 +72,28 @@ def scrape_tokopedia_with_variant(url: str, variant_key: str) -> float | None:
     except Exception as e:
         print(f'ScraperAPI js_scenario error: {e}')
         return None
+
+
+def parse_tokopedia(html: str) -> float | None:
+    """Extract harga dari halaman Tokopedia"""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Coba harga diskon dulu, fallback ke harga normal
+    selectors = [
+        {"data-testid": "lblPDPDetailProductPrice"},   # harga diskon
+        {"data-testid": "lblPDPDetailProductPriceOriginal"},  # harga normal
+    ]
+
+    for attrs in selectors:
+        el = soup.find(attrs=attrs)
+        if el:
+            raw = re.sub(r"[^\d]", "", el.get_text())
+            if raw:
+                price = float(raw)
+                if price > 0:
+                    return price
+
+    return None  # sold out atau struktur berubah
 
 
 def extract_price_tokopedia(html: str) -> float | None:
