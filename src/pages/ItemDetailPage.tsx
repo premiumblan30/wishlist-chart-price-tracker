@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Plus, Trash2, RefreshCw, Home, TrendingUp, TrendingDown, Minus, ExternalLink, Download } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer, Legend } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, formatDate, formatPriceHistoryDate, formatDistanceToNow } from '@/lib/utils'
+import { formatIDR, formatDate, formatPriceHistoryDate, formatDistanceToNow } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Item, PriceHistory } from '@/types'
 
@@ -389,12 +389,12 @@ export function ItemDetailPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Target Price</p>
-                    <p className="text-2xl font-bold">{formatCurrency(item.target_price, item.currency)}</p>
+                    <p className="text-2xl font-bold">{formatIDR(item.target_price)}</p>
                   </div>
                   {latestPrice > 0 && (
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Latest Price</p>
-                      <p className="text-2xl font-bold">{formatCurrency(latestPrice, item.currency)}</p>
+                      <p className="text-2xl font-bold">{formatIDR(latestPrice)}</p>
                     </div>
                   )}
                 </div>
@@ -441,7 +441,7 @@ export function ItemDetailPage() {
                             if (active && payload && payload.length) {
                               return (
                                 <div className="bg-background border rounded-lg p-3 shadow-lg">
-                                  <p className="font-medium">{formatCurrency(payload[0].value as number, 'IDR')}</p>
+                                  <p className="font-medium">{formatIDR(payload[0].value as number)}</p>
                                   <p className="text-sm text-muted-foreground">{formatDate(payload[0].payload.date)}</p>
                                 </div>
                               )
@@ -524,7 +524,7 @@ export function ItemDetailPage() {
                   <CardTitle className="text-sm font-medium">Lowest Price</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">{formatCurrency(lowestPrice, item.currency)}</p>
+                  <p className="text-2xl font-bold">{formatIDR(lowestPrice)}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -532,7 +532,7 @@ export function ItemDetailPage() {
                   <CardTitle className="text-sm font-medium">Highest Price</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">{formatCurrency(highestPrice, item.currency)}</p>
+                  <p className="text-2xl font-bold">{formatIDR(highestPrice)}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -540,7 +540,7 @@ export function ItemDetailPage() {
                   <CardTitle className="text-sm font-medium">Average Price</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">{formatCurrency(averagePrice, item.currency)}</p>
+                  <p className="text-2xl font-bold">{formatIDR(averagePrice)}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -596,11 +596,11 @@ export function ItemDetailPage() {
                                 rel="noopener noreferrer"
                                 className="text-teal-600 hover:text-teal-700 hover:underline inline-flex items-center gap-1"
                               >
-                                {formatCurrency(entry.price, item.currency)}
+                                {formatIDR(entry.price)}
                                 <ExternalLink className="h-3 w-3" />
                               </a>
                             ) : (
-                              formatCurrency(entry.price, item.currency)
+                              formatIDR(entry.price)
                             )}
                           </td>
                           <td className="py-3 px-4 capitalize">{entry.source}</td>
@@ -699,7 +699,7 @@ export function ItemDetailPage() {
         </DialogHeader>
         <DialogContent>
           <p>
-            Data harga {entryToDelete && formatCurrency(entryToDelete.price, item.currency)} pada {entryToDelete && formatDate(entryToDelete.scraped_at)} akan dihapus permanen.
+            Data harga {entryToDelete && formatIDR(entryToDelete.price)} pada {entryToDelete && formatDate(entryToDelete.scraped_at)} akan dihapus permanen.
           </p>
         </DialogContent>
         <DialogFooter>

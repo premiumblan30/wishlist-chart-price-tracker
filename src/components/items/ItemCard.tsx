@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Edit, Trash2, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { LineChart, Line } from 'recharts'
-import { formatCurrency, getMarketplaceBadgeColor, calculatePriceGap, formatRelativeTime, formatAbbreviatedCurrency } from '@/lib/utils'
+import { formatIDR, getMarketplaceBadgeColor, calculatePriceGap, formatRelativeTime, formatAbbreviatedCurrency, isHitTarget } from '@/lib/utils'
 import type { Item, PriceHistory } from '@/types'
 
 interface ItemCardProps {
@@ -24,7 +24,7 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
   // Calculate badges
   const latestPrice = priceHistory && priceHistory.length > 0 ? priceHistory[0].price : displayPrice
   const firstPrice = priceHistory && priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].price : displayPrice
-  const hitTarget = item.target_price && latestPrice <= item.target_price
+  const hitTarget = isHitTarget(item, latestPrice)
   const priceDrop = firstPrice > 0 ? ((firstPrice - latestPrice) / firstPrice) * 100 : 0
   const significantDrop = priceDrop >= 5
 
@@ -169,14 +169,14 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Current:</span>
-                  <span className="font-medium">{formatCurrency(displayPrice, item.currency)}</span>
+                  <span className="font-medium">{formatIDR(currentPrice)}</span>
                 </div>
 
                 {item.target_price && (
                   <>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Target:</span>
-                      <span className="font-medium">{formatCurrency(item.target_price, item.currency)}</span>
+                      <span className="font-medium">{formatIDR(item.target_price)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Gap:</span>

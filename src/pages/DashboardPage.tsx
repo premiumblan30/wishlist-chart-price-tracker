@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { TrendingDown, Target, Clock, Package, ShoppingBag } from 'lucide-react'
 import { useItems } from '@/hooks/useItems'
-import { formatRelativeTime, getMarketplaceBadgeColor } from '@/lib/utils'
+import { formatRelativeTime, getMarketplaceBadgeColor, formatIDR, isHitTarget } from '@/lib/utils'
 import { Plus } from 'lucide-react'
 
 export function DashboardPage() {
@@ -38,14 +38,19 @@ export function DashboardPage() {
   })
   const avgPriceDrop = itemsWithHistory > 0 ? (totalDrop / itemsWithHistory).toFixed(1) : '—'
 
-  // Count items that hit target
+  // Count items that hit target (using same logic as filter)
   let itemsHitTarget = 0
   items.forEach(item => {
     const history = priceHistoryMap?.get(item.id)
-    if (history && history.length > 0 && item.target_price) {
-      const latestPrice = history[0].price
-      if (latestPrice <= item.target_price) {
-        itemsHitTarget++
+    if (history && history.length > 0) {
+      // Filter only successful price history entries
+      const successfulHistory = history.filter(h => h.status === 'success')
+      if (successfulHistory.length > 0) {
+        // Get the latest price (first entry since ordered by scraped_at DESC)
+        const latestPrice = successfulHistory[0].price
+        if (isHitTarget(item, latestPrice)) {
+          itemsHitTarget++
+        }
       }
     }
   })
@@ -168,7 +173,7 @@ export function DashboardPage() {
                           <div className="text-right ml-4">
                             {item.target_price && (
                               <>
-                                <p className="font-medium">Rp {(item.target_price / 1000).toFixed(0)}k</p>
+                                <p className="font-medium">{formatIDR(item.target_price)}</p>
                                 <p className="text-sm text-muted-foreground">Target price</p>
                               </>
                             )}

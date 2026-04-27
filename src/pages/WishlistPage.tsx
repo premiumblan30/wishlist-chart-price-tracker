@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { Item } from '@/types'
+import { isHitTarget } from '@/lib/utils'
 
 type SortOption = 'Terbaru' | 'Penurunan Terbesar' | 'Terdekat ke Target' | 'Nama A-Z'
 type FilterOption = 'Semua' | 'Tokopedia' | 'Shopee' | 'Lazada' | 'Hit Target'
@@ -93,8 +94,12 @@ export function WishlistPage() {
       filtered = filtered.filter(item => {
         const history = priceHistoryMap?.get(item.id)
         if (!history || history.length === 0) return false
-        const latestPrice = history[history.length - 1].price
-        return item.target_price && latestPrice <= item.target_price
+        // Filter only successful price history entries
+        const successfulHistory = history.filter(h => h.status === 'success')
+        if (successfulHistory.length === 0) return false
+        // Get the latest price (first entry since ordered by scraped_at DESC)
+        const latestPrice = successfulHistory[0].price
+        return isHitTarget(item, latestPrice)
       })
     } else if (filterBy !== 'Semua') {
       filtered = filtered.filter(item => item.marketplace.toLowerCase() === filterBy.toLowerCase())

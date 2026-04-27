@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { Marketplace } from "@/types"
+import type { Marketplace, Item } from "@/types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -35,6 +35,21 @@ export function formatCurrency(amount: number, currency: string = 'IDR'): string
     style: 'currency',
     currency,
   }).format(amount)
+}
+
+export function formatIDR(price: number | null | undefined): string {
+  if (price === null || price === undefined) return "—"
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(price)
+}
+
+export function isHitTarget(item: Item, latestPrice: number | null): boolean {
+  if (!item.target_price || latestPrice === null) return false
+  return latestPrice <= item.target_price
 }
 
 export function getMarketplaceBadgeColor(marketplace: Marketplace): string {
