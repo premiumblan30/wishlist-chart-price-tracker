@@ -65,7 +65,10 @@ export function ItemDetailPage() {
   }, [id])
 
   const handleManualPriceSubmit = async () => {
-    if (!id || !manualPrice || !manualDate) return
+    if (!id || !manualPrice || !manualDate) {
+      toast.error('Harga harus diisi')
+      return
+    }
 
     try {
       setIsSubmittingPrice(true)
@@ -79,7 +82,7 @@ export function ItemDetailPage() {
       // Validate date is not in the future
       const selectedDate = new Date(manualDate)
       const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      today.setHours(23, 59, 59, 999)
       if (selectedDate > today) {
         toast.error('Tanggal tidak boleh di masa depan')
         return
@@ -275,14 +278,14 @@ export function ItemDetailPage() {
     )
   }
 
-  // Calculate stats
-  const lowestPrice = priceHistory.length > 0 ? Math.min(...priceHistory.map(h => h.price)) : 0
-  const highestPrice = priceHistory.length > 0 ? Math.max(...priceHistory.map(h => h.price)) : 0
-  const averagePrice = priceHistory.length > 0 
-    ? priceHistory.reduce((sum, h) => sum + h.price, 0) / priceHistory.length 
+  // Calculate stats from filtered data
+  const lowestPrice = filteredChartData.length > 0 ? Math.min(...filteredChartData.map(h => h.price)) : 0
+  const highestPrice = filteredChartData.length > 0 ? Math.max(...filteredChartData.map(h => h.price)) : 0
+  const averagePrice = filteredChartData.length > 0 
+    ? filteredChartData.reduce((sum, h) => sum + h.price, 0) / filteredChartData.length 
     : 0
-  const firstPrice = priceHistory.length > 0 ? priceHistory[0].price : 0
-  const latestPrice = priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].price : 0
+  const firstPrice = filteredChartData.length > 0 ? filteredChartData[0].price : 0
+  const latestPrice = filteredChartData.length > 0 ? filteredChartData[filteredChartData.length - 1].price : 0
   const percentChange = firstPrice > 0 ? ((latestPrice - firstPrice) / firstPrice) * 100 : 0
 
   const chartData = filteredChartData

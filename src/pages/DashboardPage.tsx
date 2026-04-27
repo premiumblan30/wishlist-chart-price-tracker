@@ -51,6 +51,8 @@ export function DashboardPage() {
     ? "—"
     : `${avgDrop > 0 ? "+" : ""}${avgDrop.toFixed(1)}%`;
 
+  const isIncrease = avgDrop !== null && avgDrop > 0;
+
   // Count items that hit target (using same logic as filter)
   let itemsHitTarget = 0
   items.forEach(item => {
@@ -112,12 +114,12 @@ export function DashboardPage() {
 
               <Card className="border-l-4 border-l-blue-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Avg Price Drop</CardTitle>
+                  <CardTitle className="text-sm font-medium">{isIncrease ? "Avg Price Change" : "Avg Price Drop"}</CardTitle>
                   <TrendingDown className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{avgDropDisplay}</div>
-                  <p className="text-xs text-muted-foreground">From peak price</p>
+                  <p className="text-xs text-muted-foreground">{isIncrease ? "From lowest price" : "From peak price"}</p>
                 </CardContent>
               </Card>
 
@@ -170,7 +172,7 @@ export function DashboardPage() {
                     {recentItems.map((item) => {
                       const badgeColor = getMarketplaceBadgeColor(item.marketplace)
                       return (
-                        <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/items/${item.id}`)}>
                           <div className="flex-1 min-w-0">
                             <h4 className="font-medium truncate">{item.name}</h4>
                             <div className="flex items-center gap-2 mt-1">

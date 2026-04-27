@@ -6,19 +6,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function detectMarketplace(url: string): Marketplace {
-  const lowerUrl = url.toLowerCase()
-  
-  if (lowerUrl.includes('shopee')) return 'shopee'
-  if (lowerUrl.includes('tokopedia')) return 'tokopedia'
-  if (lowerUrl.includes('lazada')) return 'lazada'
-  if (lowerUrl.includes('blibli')) return 'blibli'
-  
-  // Check for official brand sites (non-marketplace)
-  const marketplaceDomains = ['shopee', 'tokopedia', 'lazada', 'blibli']
-  const isMarketplace = marketplaceDomains.some(domain => lowerUrl.includes(domain))
-  
-  return isMarketplace ? 'other' : 'official'
+export function detectMarketplace(url: string): Marketplace | null {
+  try {
+    const parsed = new URL(url) // throws jika tidak valid
+    const lowerUrl = parsed.hostname.toLowerCase()
+
+    if (lowerUrl.includes('tokopedia')) return 'tokopedia'
+    if (lowerUrl.includes('shopee')) return 'shopee'
+    if (lowerUrl.includes('lazada')) return 'lazada'
+    if (lowerUrl.includes('blibli')) return 'blibli'
+    return 'official'
+  } catch {
+    return null // URL tidak valid → jangan ubah marketplace
+  }
 }
 
 export function formatCurrency(amount: number, currency: string = 'IDR'): string {
@@ -53,6 +53,17 @@ export const isHitTarget = (
 ): boolean => {
   if (!targetPrice || !latestPrice) return false;
   return latestPrice <= targetPrice;
+};
+
+export const timeAgo = (date: string): string => {
+  const diff = Date.now() - new Date(date).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+  if (hours < 24)   return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+  return `${days} ${days === 1 ? "day" : "days"} ago`;
 };
 
 export function getMarketplaceBadgeColor(marketplace: Marketplace): string {
@@ -112,11 +123,16 @@ export function formatRelativeTime(date: string): string {
   const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000)
 
   if (diffInSeconds < 60) return 'Just now'
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`
-  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)} weeks ago`
-  if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} months ago`
+  const minutes = Math.floor(diffInSeconds / 60)
+  if (diffInSeconds < 3600) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`
+  const hours = Math.floor(diffInSeconds / 3600)
+  if (diffInSeconds < 86400) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`
+  const days = Math.floor(diffInSeconds / 86400)
+  if (diffInSeconds < 604800) return `${days} ${days === 1 ? 'day' : 'days'} ago`
+  const weeks = Math.floor(diffInSeconds / 604800)
+  if (diffInSeconds < 2592000) return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`
+  const months = Math.floor(diffInSeconds / 2592000)
+  if (diffInSeconds < 31536000) return `${months} ${months === 1 ? 'month' : 'months'} ago`
   return `${Math.floor(diffInSeconds / 31536000)} years ago`
 }
 

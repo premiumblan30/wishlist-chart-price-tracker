@@ -37,6 +37,7 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
     const recent = priceHistory[0]
     const previous = priceHistory[1]
     const change = recent.price - previous.price
+    if (change === 0) return null // Hide badge if no change
     const isDrop = change < 0
     return {
       show: true,
@@ -196,7 +197,7 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Current:</span>
-                  <span className="font-medium">{formatIDR(currentPrice)}</span>
+                  <span className="font-medium">{formatIDR(latestPrice)}</span>
                 </div>
 
                 {item.target_price && (

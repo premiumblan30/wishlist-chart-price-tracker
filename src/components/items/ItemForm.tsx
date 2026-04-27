@@ -62,7 +62,8 @@ export function ItemForm({ open, onClose, onSubmit, initialData }: ItemFormProps
 
   const handleUrlChange = (value: string) => {
     setUrl(value)
-    setMarketplace(detectMarketplace(value))
+    const detected = detectMarketplace(value)
+    if (detected) setMarketplace(detected)
   }
 
   const handleSubmit = (e: React.FormEvent) => {

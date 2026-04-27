@@ -41,6 +41,13 @@ export function SettingsPage() {
   async function handleSave() {
     setLoading(true)
     try {
+      // Validate drop threshold
+      if (dropThreshold < 1 || dropThreshold > 100) {
+        toast.error('Persen penurunan minimum harus antara 1% dan 100%')
+        setLoading(false)
+        return
+      }
+
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) {
         toast.error('User not authenticated')
@@ -58,7 +65,7 @@ export function SettingsPage() {
         }, { onConflict: 'user_id' })
 
       if (error) throw error
-      toast.success('Alert settings saved successfully')
+      toast.success('Pengaturan berhasil disimpan')
     } catch (err) {
       console.error('Failed to save alert settings:', err)
       toast.error('Failed to save alert settings')
