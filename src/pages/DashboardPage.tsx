@@ -7,6 +7,7 @@ import { TrendingDown, Target, Clock, Package, ShoppingBag } from 'lucide-react'
 import { useItems } from '@/hooks/useItems'
 import { formatRelativeTime, getMarketplaceBadgeColor, formatIDR, isHitTarget } from '@/lib/utils'
 import { Plus } from 'lucide-react'
+import type { PriceHistory } from '@/types'
 
 export function DashboardPage() {
   const { items, loading, priceHistoryMap, fetchPriceHistoryForAllItems } = useItems()
@@ -22,26 +23,33 @@ export function DashboardPage() {
   const totalItems = items.length
 
   // Calculate avg price drop for items with price history
-  const itemsWithPriceData = items.filter(item => {
-    const history = priceHistoryMap?.get(item.id) ?? []
-    return history.length >= 2; // butuh min 2 titik untuk hitung perubahan
-  })
+  const calculatePriceDrop = (history: PriceHistory[]): number | null => {
+    const successEntries = history
+      .filter(h => h.status === "success" && h.price > 0)
+      .sort((a, b) => new Date(b.scraped_at).getTime() - new Date(a.scraped_at).getTime());
 
-  let totalDrop = 0
-  let itemsWithHistory = 0
-  itemsWithPriceData.forEach(item => {
-    const history = priceHistoryMap?.get(item.id) ?? []
-    if (history.length >= 2) {
-      const firstPrice = history[history.length - 1].price
-      const latestPrice = history[0].price
-      if (firstPrice > 0) {
-        const drop = ((firstPrice - latestPrice) / firstPrice) * 100
-        totalDrop += drop
-        itemsWithHistory++
-      }
-    }
-  })
-  const avgPriceDrop = itemsWithHistory > 0 ? (totalDrop / itemsWithHistory).toFixed(1) : '—'
+    if (successEntries.length < 2) return null;
+
+    const latest = successEntries[0].price;              // terbaru
+    const oldest = successEntries[successEntries.length - 1].price;  // tertua
+
+    if (oldest === 0) return null; // guard division by zero
+
+    return ((latest - oldest) / oldest) * 100;
+    // Contoh: (16449000 - 19599000) / 19599000 * 100 = -16.07%
+  };
+
+  const drops = items
+    .map(item => calculatePriceDrop(priceHistoryMap?.get(item.id) ?? []))
+    .filter((v): v is number => v !== null);
+
+  const avgDrop = drops.length === 0
+    ? null
+    : drops.reduce((sum, v) => sum + v, 0) / drops.length;
+
+  const avgDropDisplay = avgDrop === null
+    ? "—"
+    : `${avgDrop > 0 ? "+" : ""}${avgDrop.toFixed(1)}%`;
 
   // Count items that hit target (using same logic as filter)
   let itemsHitTarget = 0
@@ -108,7 +116,7 @@ export function DashboardPage() {
                   <TrendingDown className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{typeof avgPriceDrop === 'number' ? `${avgPriceDrop}%` : avgPriceDrop}</div>
+                  <div className="text-2xl font-bold">{avgDropDisplay}</div>
                   <p className="text-xs text-muted-foreground">From peak price</p>
                 </CardContent>
               </Card>

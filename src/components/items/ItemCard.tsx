@@ -25,10 +25,10 @@ export function ItemCard({ item, currentPrice, priceHistory, onEdit, onDelete }:
   const priceGap = item.target_price ? calculatePriceGap(displayPrice, item.target_price) : 0
 
   // Calculate badges
-  const latestPrice = priceHistory && priceHistory.length > 0 ? priceHistory[0].price : displayPrice
-  const firstPrice = priceHistory && priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].price : displayPrice
+  const latestPrice = priceHistory && priceHistory.length > 0 ? priceHistory[0].price : null
+  const firstPrice = priceHistory && priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].price : null
   const hitTarget = isHitTarget(item.target_price, latestPrice)
-  const priceDrop = firstPrice > 0 ? ((firstPrice - latestPrice) / firstPrice) * 100 : 0
+  const priceDrop = firstPrice && latestPrice && firstPrice > 0 ? ((firstPrice - latestPrice) / firstPrice) * 100 : 0
   const significantDrop = priceDrop >= 5
 
   // Price change badge (compare two most recent entries)
