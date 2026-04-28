@@ -119,21 +119,67 @@ def extract_price_tokopedia(html: str) -> float | None:
 
 def extract_price_generic(html: str) -> float | None:
     """Generic price extraction for other marketplaces."""
-    patterns = [
-        r'Rp\s*([\d.,]+)',                           # Indonesian format
-        r'price["\']?\s*[:=]\s*["\']?([\d.,]+)',   # generic price attribute
-        r'class="[^"]*price[^"]*"[^>]*>([\d.,]+)',  # price in element
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    # 1. Try JSON-LD structured data first
+    for script in soup.find_all('script', type='application/ld+json'):
+        try:
+            data = json.loads(script.string or '{}')
+            if isinstance(data, list):
+                data = data
+            if data.get('@type') == 'Product':
+                offers = data.get('offers', {})
+                if isinstance(offers, list):
+                    offers = offers
+                price = offers.get('price') or offers.get('lowPrice')
+                if price:
+                    p = float(str(price).replace('.', '').replace(',', ''))
+                    if 100_000 <= p <= 999_000_000:
+                        return p
+        except Exception:
+            continue
+    
+    # 2. Try og:price:amount meta tag
+    meta = soup.find('meta', {'property': 'product:price:amount'}) or \
+           soup.find('meta', {'property': 'og:price:amount'})
+    if meta and meta.get('content'):
+        try:
+            p = float(str(meta['content']).replace('.', '').replace(',', ''))
+            if 100_000 <= p <= 999_000_000:
+                return p
+        except Exception:
+            pass
+    
+    # 3. Try common CSS selectors for price elements
+    selectors = [
+        {'class': re.compile(r'price', re.I)},
+        {'data-testid': re.compile(r'price', re.I)},
+        {'id': re.compile(r'price', re.I)},
     ]
-    for pattern in patterns:
-        match = re.search(pattern, html, re.IGNORECASE)
-        if match:
-            price_str = match.group(1).replace('.', '').replace(',', '')
-            try:
-                price = float(price_str)
-                if 1000 <= price <= 999_000_000:
-                    return price
-            except ValueError:
-                continue
+    for attrs in selectors:
+        el = soup.find(attrs=attrs)
+        if el:
+            raw = re.sub(r'[^\d]', '', el.get_text())
+            if raw:
+                try:
+                    p = float(raw)
+                    if 100_000 <= p <= 999_000_000:
+                        return p
+                except ValueError:
+                    continue
+    
+    # 4. Fall back to regex Rp pattern - return highest price in range
+    prices = []
+    for match in re.finditer(r'Rp\s*([\d.]+)', html):
+        try:
+            p = float(match.group(1).replace('.', ''))
+            if 100_000 <= p <= 999_000_000:
+                prices.append(p)
+        except Exception:
+            pass
+    if prices:
+        return max(prices)
+    
     return None
 
 
@@ -168,47 +214,46 @@ def parse_blibli(html: str) -> float | None:
 
 def scrape_blibli_api(url: str) -> float | None:
     import re
-    # Extract SKU from URL — pattern: /is--{SKU}
     match = re.search(r'/is--([A-Z0-9\-]+)', url)
     if not match:
         print(f'Could not extract Blibli SKU from URL: {url}')
         return None
     sku = match.group(1)
     api_url = f'https://www.blibli.com/backend/product-detail/products/{sku}/_summary'
+    scraperapi_key = os.getenv('SCRAPERAPI_KEY', '')
+    # Route through ScraperAPI to bypass Blibli 403
+    proxied_url = f'http://api.scraperapi.com/?api_key={scraperapi_key}&url={requests.utils.quote(api_url)}'
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': 'application/json',
         'Referer': 'https://www.blibli.com/',
-        'Origin': 'https://www.blibli.com',
     }
     try:
-        resp = requests.get(api_url, headers=headers, timeout=15)
+        resp = requests.get(proxied_url, headers=headers, timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        # Navigate to price in response
         price = None
-        # Try common paths in Blibli API response
-        try:
-            price = data['data']['defaultPrice']['offerPrice']
-        except (KeyError, TypeError):
-            pass
-        if not price:
+        paths = [
+            ['data', 'defaultPrice', 'offerPrice'],
+            ['data', 'price', 'offerPrice'],
+            ['data', 'minPrice'],
+            ['data', 'price'],
+        ]
+        for path in paths:
             try:
-                price = data['data']['price']['offerPrice']
+                val = data
+                for key in path:
+                    val = val[key]
+                if val:
+                    price = float(str(val).replace('.', '').replace(',', ''))
+                    if 100_000 <= price <= 999_000_000:
+                        print(f'Blibli API price found via path {path}: Rp {price:,.0f}')
+                        return price
             except (KeyError, TypeError):
-                pass
-        if not price:
-            try:
-                price = data['data']['minPrice']
-            except (KeyError, TypeError):
-                pass
-        if price:
-            p = float(str(price).replace('.', '').replace(',', ''))
-            if 100_000 <= p <= 999_000_000:
-                print(f'Blibli API price found: Rp {p:,.0f}')
-                return p
-        # Debug: print keys if price not found
-        print(f'Blibli API response keys: {list(data.get("data", {}).keys())[:10]}')
+                continue
+        # Debug: print top-level keys if not found
+        print(f'Blibli API response top keys: {list(data.keys())}')
+        if 'data' in data:
+            print(f'Blibli data keys: {list(data["data"].keys())[:15]}')
         return None
     except Exception as e:
         print(f'Blibli API error: {e}')
