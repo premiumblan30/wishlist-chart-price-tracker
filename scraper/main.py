@@ -213,50 +213,77 @@ def parse_blibli(html: str) -> float | None:
 
 
 def scrape_blibli_api(url: str) -> float | None:
-    import re
-    match = re.search(r'/is--([A-Z0-9\-]+)', url)
-    if not match:
-        print(f'Could not extract Blibli SKU from URL: {url}')
-        return None
-    sku = match.group(1)
-    api_url = f'https://www.blibli.com/backend/product-detail/products/{sku}/_summary'
     scraperapi_key = os.getenv('SCRAPERAPI_KEY', '')
-    # Route through ScraperAPI to bypass Blibli 403
-    proxied_url = f'http://api.scraperapi.com/?api_key={scraperapi_key}&url={requests.utils.quote(api_url)}'
-    headers = {
-        'Accept': 'application/json',
-        'Referer': 'https://www.blibli.com/',
-    }
-    try:
-        resp = requests.get(proxied_url, headers=headers, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        price = None
-        paths = [
-            ['data', 'defaultPrice', 'offerPrice'],
-            ['data', 'price', 'offerPrice'],
-            ['data', 'minPrice'],
-            ['data', 'price'],
+    # Use js_scenario to wait for price element to render
+    js_scenario = {
+        "instructions": [
+            {"wait": 3000},
+            {"wait_for_selector": "[data-testid='pdp-product-price'], .blu-product__price, .pdp-price, [class*='ProductPrice'], [class*='product-price']"}
         ]
-        for path in paths:
+    }
+    import urllib.parse
+    scenario_encoded = urllib.parse.quote(json.dumps(js_scenario))
+    proxied_url = f'http://api.scraperapi.com/?api_key={scraperapi_key}&url={urllib.parse.quote(url)}&render_js=true&js_scenario={scenario_encoded}'
+    try:
+        resp = requests.get(proxied_url, timeout=60)
+        resp.raise_for_status()
+        html = resp.text
+        soup = BeautifulSoup(html, 'html.parser')
+        # 1. Try JSON-LD
+        for script in soup.find_all('script', type='application/ld+json'):
             try:
-                val = data
-                for key in path:
-                    val = val[key]
-                if val:
-                    price = float(str(val).replace('.', '').replace(',', ''))
-                    if 100_000 <= price <= 999_000_000:
-                        print(f'Blibli API price found via path {path}: Rp {price:,.0f}')
-                        return price
-            except (KeyError, TypeError):
+                data = json.loads(script.string or '{}')
+                if isinstance(data, list):
+                    data = data
+                if data.get('@type') == 'Product':
+                    offers = data.get('offers', {})
+                    if isinstance(offers, list):
+                        offers = offers
+                    price = offers.get('price') or offers.get('lowPrice')
+                    if price:
+                        p = float(str(price).replace('.', '').replace(',', ''))
+                        if 1_000_000 <= p <= 999_000_000:
+                            print(f'Blibli JSON-LD price: Rp {p:,.0f}')
+                            return p
+            except Exception:
                 continue
-        # Debug: print top-level keys if not found
-        print(f'Blibli API response top keys: {list(data.keys())}')
-        if 'data' in data:
-            print(f'Blibli data keys: {list(data["data"].keys())[:15]}')
+        # 2. Try specific Blibli price selectors
+        selectors = [
+            '[data-testid="pdp-product-price"]',
+            '.blu-product__price',
+            '.pdp-price',
+            '[class*="ProductPrice"]',
+            '[class*="product-price"]',
+            '[class*="final-price"]',
+        ]
+        for selector in selectors:
+            el = soup.select_one(selector)
+            if el:
+                raw = re.sub(r'[^\d]', '', el.get_text())
+                if raw:
+                    p = float(raw)
+                    if 1_000_000 <= p <= 999_000_000:
+                        print(f'Blibli selector "{selector}" price: Rp {p:,.0f}')
+                        return p
+        # 3. Debug: log all prices found
+        prices = []
+        for match in re.finditer(r'Rp\s*([\d.]+)', html):
+            try:
+                p = float(match.group(1).replace('.', ''))
+                if 1_000_000 <= p <= 999_000_000:
+                    prices.append(p)
+            except Exception:
+                pass
+        unique_prices = sorted(set(prices))
+        print(f'Blibli all prices found: {unique_prices}')
+        # Return highest price as main price heuristic
+        if unique_prices:
+            best = max(unique_prices)
+            print(f'Blibli using highest price: Rp {best:,.0f}')
+            return best
         return None
     except Exception as e:
-        print(f'Blibli API error: {e}')
+        print(f'Blibli scrape error: {e}')
         return None
 
 
