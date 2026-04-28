@@ -137,6 +137,42 @@ def extract_price_generic(html: str) -> float | None:
     return None
 
 
+def parse_blibli(html: str) -> float | None:
+    soup = BeautifulSoup(html, 'html.parser')
+    # Try structured data first (most reliable)
+    for script in soup.find_all('script', type='application/ld+json'):
+        try:
+            data = json.loads(script.string)
+            if isinstance(data, list):
+                data = data
+            if data.get('@type') in ('Product', 'Offer'):
+                offers = data.get('offers', data)
+                price = offers.get('price') or offers.get('lowPrice')
+                if price:
+                    return float(str(price).replace('.', '').replace(',', ''))
+        except Exception:
+            continue
+    # Try Blibli-specific selectors
+    selectors = [
+        {'class': re.compile(r'price.*final|final.*price', re.I)},
+        {'data-testid': re.compile(r'price', re.I)},
+        {'class': re.compile(r'blu-product__price', re.I)},
+    ]
+    for attrs in selectors:
+        el = soup.find(attrs=attrs)
+        if el:
+            raw = re.sub(r'[^\d]', '', el.get_text())
+            if raw and 1000 <= int(raw) <= 999_000_000:
+                return float(raw)
+    # Regex fallback for Rp pattern
+    matches = re.findall(r'Rp\s*([\d.,]+)', html)
+    for m in matches:
+        val = float(re.sub(r'[^\d]', '', m))
+        if 100_000 <= val <= 999_000_000:
+            return val
+    return None
+
+
 def fetch_html(url: str) -> str | None:
     """Fetch HTML using ScraperAPI to avoid bot detection."""
     if not scraperapi_key:
@@ -192,7 +228,7 @@ def check_and_notify(item: dict, new_price: float, previous_price: float | None)
         alert_resp = supabase.table('alert_settings')\
             .select('*')\
             .eq('user_id', item['user_id'])\
-            .single()\
+            .maybe_single()\
             .execute()
         if not alert_resp.data:
             return
@@ -251,7 +287,7 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
             try:
                 supabase.table('price_history').insert({
                     'item_id': item_id,
-                    'price': None,
+                    'price': 0,
                     'source': 'cron',
                     'status': 'failed',
                     'scraped_at': datetime.utcnow().isoformat()
@@ -266,6 +302,8 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
         # Extract price based on marketplace
         if marketplace == 'tokopedia':
             price = extract_price_tokopedia(html)
+        elif marketplace == 'blibli':
+            price = parse_blibli(html)
         else:
             price = extract_price_generic(html)
 
@@ -282,7 +320,7 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
         try:
             supabase.table('price_history').insert({
                 'item_id': item_id,
-                'price': None,
+                'price': 0,
                 'source': 'cron',
                 'status': 'failed',
                 'scraped_at': datetime.utcnow().isoformat()
