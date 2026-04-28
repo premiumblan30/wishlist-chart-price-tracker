@@ -166,6 +166,55 @@ def parse_blibli(html: str) -> float | None:
     return None  # Temporarily return None to just see debug output
 
 
+def scrape_blibli_api(url: str) -> float | None:
+    import re
+    # Extract SKU from URL — pattern: /is--{SKU}
+    match = re.search(r'/is--([A-Z0-9\-]+)', url)
+    if not match:
+        print(f'Could not extract Blibli SKU from URL: {url}')
+        return None
+    sku = match.group(1)
+    api_url = f'https://www.blibli.com/backend/product-detail/products/{sku}/_summary'
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Referer': 'https://www.blibli.com/',
+        'Origin': 'https://www.blibli.com',
+    }
+    try:
+        resp = requests.get(api_url, headers=headers, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        # Navigate to price in response
+        price = None
+        # Try common paths in Blibli API response
+        try:
+            price = data['data']['defaultPrice']['offerPrice']
+        except (KeyError, TypeError):
+            pass
+        if not price:
+            try:
+                price = data['data']['price']['offerPrice']
+            except (KeyError, TypeError):
+                pass
+        if not price:
+            try:
+                price = data['data']['minPrice']
+            except (KeyError, TypeError):
+                pass
+        if price:
+            p = float(str(price).replace('.', '').replace(',', ''))
+            if 100_000 <= p <= 999_000_000:
+                print(f'Blibli API price found: Rp {p:,.0f}')
+                return p
+        # Debug: print keys if price not found
+        print(f'Blibli API response keys: {list(data.get("data", {}).keys())[:10]}')
+        return None
+    except Exception as e:
+        print(f'Blibli API error: {e}')
+        return None
+
+
 def fetch_html(url: str) -> str | None:
     """Fetch HTML using ScraperAPI to avoid bot detection."""
     if not scraperapi_key:
@@ -274,6 +323,20 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
                 price = extract_price_tokopedia(html)
             else:
                 price = None
+    elif marketplace == 'blibli':
+        price = scrape_blibli_api(url)
+        if price:
+            # Insert to price_history
+            supabase.table('price_history').insert({
+                'item_id': item_id,
+                'price': price,
+                'source': 'cron',
+                'status': 'success',
+                'scraped_at': datetime.utcnow().isoformat()
+            }).execute()
+            return {'success': True, 'price': price}
+        else:
+            return {'success': False, 'error': 'Could not extract Blibli price via API'}
     else:
         html = fetch_html(url)
         if not html:
