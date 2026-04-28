@@ -139,37 +139,50 @@ def extract_price_generic(html: str) -> float | None:
 
 def parse_blibli(html: str) -> float | None:
     soup = BeautifulSoup(html, 'html.parser')
-    # Try structured data first (most reliable)
+    # 1. JSON-LD structured data — most reliable
     for script in soup.find_all('script', type='application/ld+json'):
         try:
-            data = json.loads(script.string)
+            data = json.loads(script.string or '{}')
             if isinstance(data, list):
                 data = data
-            if data.get('@type') in ('Product', 'Offer'):
-                offers = data.get('offers', data)
+            if data.get('@type') == 'Product':
+                offers = data.get('offers', {})
+                if isinstance(offers, list):
+                    offers = offers
                 price = offers.get('price') or offers.get('lowPrice')
                 if price:
-                    return float(str(price).replace('.', '').replace(',', ''))
+                    p = float(str(price).replace('.', '').replace(',', ''))
+                    if 100_000 <= p <= 999_000_000:
+                        return p
         except Exception:
             continue
-    # Try Blibli-specific selectors
-    selectors = [
-        {'class': re.compile(r'price.*final|final.*price', re.I)},
-        {'data-testid': re.compile(r'price', re.I)},
-        {'class': re.compile(r'blu-product__price', re.I)},
-    ]
-    for attrs in selectors:
-        el = soup.find(attrs=attrs)
-        if el:
-            raw = re.sub(r'[^\d]', '', el.get_text())
-            if raw and 1000 <= int(raw) <= 999_000_000:
-                return float(raw)
-    # Regex fallback for Rp pattern
-    matches = re.findall(r'Rp\s*([\d.,]+)', html)
-    for m in matches:
-        val = float(re.sub(r'[^\d]', '', m))
-        if 100_000 <= val <= 999_000_000:
-            return val
+    # 2. og:price meta tag
+    meta = soup.find('meta', {'property': 'product:price:amount'}) or \
+           soup.find('meta', {'property': 'og:price:amount'})
+    if meta and meta.get('content'):
+        try:
+            p = float(str(meta['content']).replace('.', '').replace(',', ''))
+            if 100_000 <= p <= 999_000_000:
+                return p
+        except Exception:
+            pass
+    # 3. Blibli-specific price element (main price, not installment)
+    # Look for the largest price on page as main price heuristic
+    prices = []
+    for el in soup.find_all(string=re.compile(r'Rp\s*[\d.,]+')):
+        matches = re.findall(r'Rp\s*([\d.]+)', str(el))
+        for m in matches:
+            try:
+                p = float(m.replace('.', ''))
+                if 1_000_000 <= p <= 999_000_000:  # min 1jt for phones
+                    prices.append(p)
+            except Exception:
+                pass
+    if prices:
+        # Return the most common price (appears most frequently = main price)
+        from collections import Counter
+        most_common = Counter(prices).most_common(1)
+        return most_common[0][0]
     return None
 
 
@@ -230,8 +243,9 @@ def check_and_notify(item: dict, new_price: float, previous_price: float | None)
             .eq('user_id', item['user_id'])\
             .maybe_single()\
             .execute()
-        if not alert_resp.data:
-            return
+        # maybe_single returns None in .data when no row exists
+        if not alert_resp or not alert_resp.data:
+            return  # No alert settings configured yet
         settings = alert_resp.data
         if not settings.get('email_enabled', True):
             return
@@ -283,21 +297,8 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
     else:
         html = fetch_html(url)
         if not html:
-            # Insert failed status for HTML fetch failure
-            try:
-                supabase.table('price_history').insert({
-                    'item_id': item_id,
-                    'price': 0,
-                    'source': 'cron',
-                    'status': 'failed',
-                    'scraped_at': datetime.utcnow().isoformat()
-                }).execute()
-            except Exception as e:
-                print(f'Failed to insert failed status: {e}')
-            return {
-                'success': False,
-                'error': 'Failed to fetch HTML',
-            }
+            print(f'Failed to fetch HTML for item {item_id}')
+            return {'success': False, 'error': 'Failed to fetch HTML'}
 
         # Extract price based on marketplace
         if marketplace == 'tokopedia':
@@ -314,23 +315,9 @@ def scrape_item(item_id: str, url: str, marketplace: str, variant_key: str | Non
         }
 
     # Validate price is positive
-    if price <= 0:
-        print(f'Invalid price {price} for item {item_id}, skipping insert')
-        # Insert with status='failed' instead of skipping silently
-        try:
-            supabase.table('price_history').insert({
-                'item_id': item_id,
-                'price': 0,
-                'source': 'cron',
-                'status': 'failed',
-                'scraped_at': datetime.utcnow().isoformat()
-            }).execute()
-        except Exception as e:
-            print(f'Failed to insert failed status: {e}')
-        return {
-            'success': False,
-            'error': f'Invalid price: {price}',
-        }
+    if price is None or price <= 0:
+        print(f'Invalid or null price for item {item_id}, skipping')
+        return {'success': False, 'error': f'Invalid price: {price}'}
 
     # Insert price history
     try:
