@@ -139,51 +139,31 @@ def extract_price_generic(html: str) -> float | None:
 
 def parse_blibli(html: str) -> float | None:
     soup = BeautifulSoup(html, 'html.parser')
-    # 1. JSON-LD structured data — most reliable
-    for script in soup.find_all('script', type='application/ld+json'):
+    # Debug: print all JSON-LD scripts
+    for i, script in enumerate(soup.find_all('script', type='application/ld+json')):
         try:
             data = json.loads(script.string or '{}')
-            if isinstance(data, list):
-                data = data
+            print(f'JSON-LD [{i}]: type={data.get("@type")}, keys={list(data.keys())[:5]}')
             if data.get('@type') == 'Product':
-                offers = data.get('offers', {})
-                if isinstance(offers, list):
-                    offers = offers
-                price = offers.get('price') or offers.get('lowPrice')
-                if price:
-                    p = float(str(price).replace('.', '').replace(',', ''))
-                    if 100_000 <= p <= 999_000_000:
-                        return p
-        except Exception:
-            continue
-    # 2. og:price meta tag
-    meta = soup.find('meta', {'property': 'product:price:amount'}) or \
-           soup.find('meta', {'property': 'og:price:amount'})
-    if meta and meta.get('content'):
+                print(f'Product offers: {data.get("offers")}')
+        except Exception as e:
+            print(f'JSON-LD parse error: {e}')
+    # Debug: print all Rp prices found on page
+    all_prices = []
+    for match in re.finditer(r'Rp\s*([\d.]+)', html):
         try:
-            p = float(str(meta['content']).replace('.', '').replace(',', ''))
-            if 100_000 <= p <= 999_000_000:
-                return p
+            p = float(match.group(1).replace('.', ''))
+            if 1_000_000 <= p <= 50_000_000:
+                all_prices.append(p)
         except Exception:
             pass
-    # 3. Blibli-specific price element (main price, not installment)
-    # Look for the largest price on page as main price heuristic
-    prices = []
-    for el in soup.find_all(string=re.compile(r'Rp\s*[\d.,]+')):
-        matches = re.findall(r'Rp\s*([\d.]+)', str(el))
-        for m in matches:
-            try:
-                p = float(m.replace('.', ''))
-                if 1_000_000 <= p <= 999_000_000:  # min 1jt for phones
-                    prices.append(p)
-            except Exception:
-                pass
-    if prices:
-        # Return the most common price (appears most frequently = main price)
-        from collections import Counter
-        most_common = Counter(prices).most_common(1)
-        return most_common[0][0]
-    return None
+    print(f'All prices found on Blibli page (1jt-50jt range): {sorted(set(all_prices))}')
+    # Debug: check og meta tags
+    for meta in soup.find_all('meta'):
+        name = meta.get('property', '') or meta.get('name', '')
+        if 'price' in name.lower():
+            print(f'Meta price tag: {name} = {meta.get("content")}')
+    return None  # Temporarily return None to just see debug output
 
 
 def fetch_html(url: str) -> str | None:
