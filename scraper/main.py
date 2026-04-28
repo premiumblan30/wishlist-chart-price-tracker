@@ -2,6 +2,7 @@ import os
 import re
 import requests
 import json
+import time
 from supabase import create_client, Client
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -223,9 +224,9 @@ def scrape_blibli_api(url: str) -> float | None:
     }
     import urllib.parse
     scenario_encoded = urllib.parse.quote(json.dumps(js_scenario))
-    proxied_url = f'http://api.scraperapi.com/?api_key={scraperapi_key}&url={urllib.parse.quote(url)}&render_js=true&js_scenario={scenario_encoded}'
+    proxied_url = f'http://api.scraperapi.com/?api_key={scraperapi_key}&url={urllib.parse.quote(url)}&render_js=true&premium=true&country_code=id&js_scenario={scenario_encoded}'
     try:
-        resp = requests.get(proxied_url, timeout=60)
+        resp = requests.get(proxied_url, timeout=90)
         resp.raise_for_status()
         html = resp.text
         soup = BeautifulSoup(html, 'html.parser')
@@ -287,32 +288,31 @@ def scrape_blibli_api(url: str) -> float | None:
         return None
 
 
-def fetch_html(url: str) -> str | None:
+def fetch_html(url: str, retries: int = 3) -> str | None:
     """Fetch HTML using ScraperAPI to avoid bot detection."""
-    if not scraperapi_key:
-        # Fallback to direct requests if no API key
+    for attempt in range(retries):
         try:
-            response = requests.get(url, timeout=10)
+            if not scraperapi_key:
+                # Fallback to direct requests if no API key
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                return response.text
+
+            # Use ScraperAPI
+            payload = {
+                'api_key': scraperapi_key,
+                'url': url,
+                'render_js': 'true',
+            }
+
+            response = requests.get('http://api.scraperapi.com', params=payload, timeout=30)
             response.raise_for_status()
             return response.text
         except Exception as e:
-            print(f'Error fetching URL: {e}')
-            return None
-
-    # Use ScraperAPI
-    payload = {
-        'api_key': scraperapi_key,
-        'url': url,
-        'render_js': 'true',
-    }
-
-    try:
-        response = requests.get('http://api.scraperapi.com', params=payload, timeout=30)
-        response.raise_for_status()
-        return response.text
-    except Exception as e:
-        print(f'Error fetching via ScraperAPI: {e}')
-        return None
+            print(f'Fetch attempt {attempt+1}/{retries} failed: {e}')
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)  # backoff: 1s, 2s
+    return None
 
 
 def send_email(to: str, subject: str, body: str):
